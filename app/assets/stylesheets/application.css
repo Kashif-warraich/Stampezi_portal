@@ -1,0 +1,79 @@
+:root {
+  --fg: #171717;
+  --bg: #ffffff;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #ededed; --bg: #0a0a0a; --muted: #9ca3af; --line: #262626; }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--fg);
+  background: var(--bg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+main.narrow { max-width: 26rem; }
+
+h1 { font-size: 1.5rem; margin: 0 0 1.25rem; }
+h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+
+a { color: inherit; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+
+.topbar {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .75rem 1.5rem; border-bottom: 1px solid var(--line);
+}
+.spacer { flex: 1; }
+
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th { text-align: left; padding: .5rem 0; border-bottom: 1px solid var(--line); }
+td { padding: .55rem 0; border-bottom: 1px solid var(--line); }
+
+.status-active { color: var(--ok); }
+.status-grace { color: var(--warn); }
+.status-expired { color: var(--bad); }
+.status-no-license { color: var(--muted); }
+
+label { display: flex; flex-direction: column; gap: .25rem; font-size: .875rem; margin-bottom: 1rem; }
+input[type=text], input[type=email], input[type=password], input[type=number] {
+  padding: .55rem .7rem; border: 1px solid var(--line); border-radius: .375rem;
+  background: transparent; color: inherit; font: inherit;
+}
+
+button, .btn {
+  font: inherit; padding: .55rem .9rem; border-radius: .375rem;
+  border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer;
+}
+button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:disabled { opacity: .5; cursor: default; }
+.linkish { border: 0; padding: 0; text-decoration: underline; }
+
+form.inline { display: flex; align-items: flex-end; gap: .75rem; flex-wrap: wrap; }
+form.inline label { margin-bottom: 0; }
+
+.flash { margin: 0; padding: .75rem 1.5rem; font-size: .9rem; }
+.flash.ok { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.flash.bad { background: color-mix(in srgb, var(--bad) 12%, transparent); }
+
+.card { border: 1px solid var(--line); border-radius: .5rem; padding: 1.25rem; }
+
+/* Upload page: the label is the tap target, so it gets a comfortable size on a phone. */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  padding: 2.5rem 1rem; text-align: center; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: .5rem;
+}
+.dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.break { word-break: break-all; }

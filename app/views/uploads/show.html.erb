@@ -1,0 +1,126 @@
+<% content_for :title, "Send a file to the shop" %>
+<main class="narrow" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:1.5rem">
+  <header>
+    <h1 style="margin-bottom:.25rem">Send a file to the shop</h1>
+    <p class="muted" style="margin:0">One file at a time, up to <%= UploadRules.max_megabytes %> MB.</p>
+  </header>
+
+  <section id="picker">
+    <label class="dropzone">
+      <span id="picker-label" style="font-weight:500">Choose a file</span>
+      <span class="muted" style="font-size:.75rem"><%= UploadRules::ALLOWED_EXTENSIONS.join(", ") %></span>
+      <input id="file" type="file"
+             accept="<%= UploadRules::ALLOWED_EXTENSIONS.map { |e| ".#{e}" }.join(",") %>">
+    </label>
+    <p id="progress" class="muted break" style="font-size:.875rem" aria-live="polite"></p>
+    <div id="error" style="display:none" aria-live="polite">
+      <p class="status-expired" id="error-text" style="font-size:.875rem"></p>
+      <button type="button" data-reset>Try again</button>
+    </div>
+  </section>
+
+  <section id="done" class="card" style="display:none">
+    <p style="font-size:1.05rem;font-weight:500">Your file has been sent to the shop</p>
+    <p class="muted break" id="done-name" style="font-size:.875rem"></p>
+    <button type="button" data-reset>Send another file</button>
+  </section>
+</main>
+
+<script type="application/json" id="upload-config">
+  <%= { allowed: UploadRules::ALLOWED_EXTENSIONS, maxBytes: UploadRules::MAX_UPLOAD_BYTES }.to_json.html_safe %>
+</script>
+
+<script>
+  // The whole flow: ask for a slot, PUT straight to R2, tell the server it landed.
+  // The file never passes through this app, and this page never learns the licence
+  // number - that rides along as an httpOnly cookie the QR link set.
+  (function () {
+    var config = JSON.parse(document.getElementById("upload-config").textContent);
+    var maxMb = Math.round(config.maxBytes / (1024 * 1024));
+
+    var input = document.getElementById("file");
+    var picker = document.getElementById("picker");
+    var pickerLabel = document.getElementById("picker-label");
+    var progress = document.getElementById("progress");
+    var errorBox = document.getElementById("error");
+    var errorText = document.getElementById("error-text");
+    var done = document.getElementById("done");
+    var doneName = document.getElementById("done-name");
+
+    function fail(text) {
+      progress.textContent = "";
+      pickerLabel.textContent = "Choose a file";
+      input.disabled = false;
+      errorText.textContent = text;
+      errorBox.style.display = "block";
+    }
+
+    function reset() {
+      input.value = "";
+      input.disabled = false;
+      pickerLabel.textContent = "Choose a file";
+      progress.textContent = "";
+      errorBox.style.display = "none";
+      done.style.display = "none";
+      picker.style.display = "block";
+    }
+
+    document.querySelectorAll("[data-reset]").forEach(function (button) {
+      button.addEventListener("click", reset);
+    });
+
+    function extensionOf(name) {
+      var dot = name.lastIndexOf(".");
+      return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+    }
+
+    input.addEventListener("change", async function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+
+      errorBox.style.display = "none";
+
+      // Same checks the server makes, so the phone fails fast instead of uploading first.
+      if (config.allowed.indexOf(extensionOf(file.name)) === -1) {
+        return fail("That kind of file can't be sent. Allowed: " + config.allowed.join(", ") + ".");
+      }
+      if (file.size > config.maxBytes) return fail("That file is too big. The limit is " + maxMb + " MB.");
+      if (file.size === 0) return fail("That file is empty. Please pick another one.");
+
+      input.disabled = true;
+      pickerLabel.textContent = "Sending…";
+      progress.textContent = "Sending " + file.name + ". Keep this page open.";
+
+      try {
+        var sessionResponse = await fetch("/api/upload-session", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ fileName: file.name })
+        });
+
+        if (sessionResponse.status === 401 || sessionResponse.status === 404) {
+          return fail("Please scan the shop's QR code again to start.");
+        }
+        if (!sessionResponse.ok) return fail("That kind of file can't be sent. Please try a different file.");
+
+        var session = await sessionResponse.json();
+
+        var putResponse = await fetch(session.presignedPutUrl, { method: "PUT", body: file });
+        if (!putResponse.ok) return fail("The upload didn't finish. Please check your connection and try again.");
+
+        var completeResponse = await fetch("/api/upload-complete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId: session.sessionId })
+        });
+        if (!completeResponse.ok) return fail("The upload didn't finish. Please try again.");
+
+        picker.style.display = "none";
+        doneName.textContent = file.name;
+        done.style.display = "block";
+      } catch (e) {
+        fail("Something went wrong. Please check your connection and try again.");
+      }
+    });
+  })();
+</script>

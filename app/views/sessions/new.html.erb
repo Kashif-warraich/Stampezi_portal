@@ -1,0 +1,17 @@
+<% content_for :title, "Stampezi admin" %>
+<main class="narrow" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center">
+  <h1>Stampezi admin</h1>
+
+  <%= form_with url: admin_login_path, method: :post do |form| %>
+    <%= hidden_field_tag :next, params[:next] %>
+    <label>
+      Email
+      <%= form.email_field :email, autocomplete: "username", required: true, autofocus: true %>
+    </label>
+    <label>
+      Password
+      <%= form.password_field :password, autocomplete: "current-password", required: true %>
+    </label>
+    <%= form.submit "Sign in", class: "primary" %>
+  <% end %>
+</main>

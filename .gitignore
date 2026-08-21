@@ -1,0 +1,24 @@
+# See https://help.github.com/articles/ignoring-files for more about ignoring files.
+
+# Bundler config.
+/.bundle
+
+# Every credential lives here, so it never goes in the repo - production sets the same
+# names as real environment variables instead.
+/.env
+
+# Visual Studio's per-user cache.
+/.vs
+
+# Logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+!/tmp/pids/.keep
+
+/public/assets
+
+# Compiled by dartsass-rails
+/app/assets/builds/*
+!/app/assets/builds/.keep

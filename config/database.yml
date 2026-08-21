@@ -1,0 +1,20 @@
+# One mechanism everywhere: DATABASE_URL, out of .env locally and out of Render's managed
+# database in production. Spelling out `url:` here also stops Rails from silently merging
+# DATABASE_URL into the test config - otherwise `rails test` would truncate development data.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+
+development:
+  <<: *default
+  url: <%= ENV.fetch("DATABASE_URL") %>
+
+# Same server, its own database. Never DATABASE_URL as-is.
+test:
+  <<: *default
+  url: <%= ENV.fetch("DATABASE_URL").sub(%r{/[^/?]+(\?|\z)}, '/stampezi_test\1') %>
+
+production:
+  <<: *default
+  url: <%= ENV.fetch("DATABASE_URL") %>

@@ -1,0 +1,15 @@
+<% if shop.license %>
+  <%= form_with url: extend_license_admin_shop_path(shop), method: :post do |form| %>
+    <label style="display:block;font-size:.8rem;margin-bottom:.35rem">Extend by (months)</label>
+    <%= form.number_field :months, value: 1, min: 1, max: 120, style: "width:5rem" %>
+    <%= form.submit "Extend" %>
+  <% end %>
+
+  <hr style="margin:1rem 0">
+
+  <p style="font-size:.8rem">
+    Clears the bound machine so the shop can reinstall on a new PC. Allowed once every 30 days.
+  </p>
+  <%= button_to "Reset machine binding", reset_binding_admin_shop_path(shop), method: :post,
+        form: { data: { turbo_confirm: "Clear the machine binding for #{shop.name}?" } } %>
+<% end %>
