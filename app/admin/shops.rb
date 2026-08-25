@@ -6,6 +6,19 @@ ActiveAdmin.register Shop do
   filter :name
   filter :created_at
 
+  # The rollout control. Select a handful of shops, set them at the new version, wait a
+  # day, then widen. Publishing a release arms nothing on its own - this does.
+  batch_action :set_target_version, form: -> {
+    { version: AgentRelease.newest_first(AgentRelease.installable).map(&:version) + [ [ "None (freeze)", "" ] ] }
+  } do |ids, inputs|
+    version = inputs[:version].presence
+    Shop.where(id: ids).update_all(target_agent_version: version, updated_at: Time.current)
+    AppLog.info("agent_update.rollout", version: version || "none", shops: ids.size)
+
+    redirect_to collection_path,
+      notice: version ? "#{ids.size} shop(s) targeted at #{version}" : "#{ids.size} shop(s) frozen"
+  end
+
   index do
     selectable_column
     column :name do |shop|
@@ -20,6 +33,14 @@ ActiveAdmin.register Shop do
     end
     column("Expires") { |shop| shop.license&.expires_at }
     column("Last check-in") { |shop| shop.license&.last_check_at }
+    column("Agent") do |shop|
+      running = shop.license&.agent_version
+      target  = shop.target_agent_version
+      if target.blank?         then status_tag(running || "unknown", class: :warning)
+      elsif running == target  then status_tag(running, class: :ok)
+      else                          status_tag("#{running || '?'} → #{target}", class: :warning)
+      end
+    end
     column("QR") { |shop| shop.license ? link_to("Download", qr_admin_shop_path(shop)) : nil }
     actions
   end
@@ -41,6 +62,8 @@ ActiveAdmin.register Shop do
           row("Machine") { licence.machine_fingerprint || "not bound" }
           row("Last check-in") { licence.last_check_at }
           row("Last binding reset") { licence.last_reset_at }
+          row("Agent version running") { licence.agent_version || "not reported" }
+          row("Agent version targeted") { resource.target_agent_version || "none (frozen)" }
           row("QR code") { link_to "Download PNG", qr_admin_shop_path(resource) }
         end
       end

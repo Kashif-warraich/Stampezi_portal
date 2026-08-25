@@ -9,7 +9,7 @@ class License < ApplicationRecord
   validates :expires_at, presence: true
 
   def self.ransackable_attributes(_auth = nil)
-    %w[id license_number shop_id expires_at machine_fingerprint last_check_at last_reset_at created_at]
+    %w[id license_number shop_id expires_at machine_fingerprint agent_version last_check_at last_reset_at created_at]
   end
 
   def self.ransackable_associations(_auth = nil) = %w[shop]

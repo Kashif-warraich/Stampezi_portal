@@ -19,6 +19,10 @@ Rails.application.routes.draw do
     post "license/extend",        to: "licenses#extend_license"
     post "license/reset-binding", to: "licenses#reset_binding"
 
+    # Release publishing, driven from the build machine with the admin bearer token.
+    post "agent-releases",             to: "agent_releases#create"
+    post "agent-releases/:id/publish", to: "agent_releases#publish"
+
     post "upload-session",  to: "upload_sessions#create"
     post "upload-complete", to: "upload_completions#create"
     get  "pending-files",   to: "pending_files#index"

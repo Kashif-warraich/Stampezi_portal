@@ -34,8 +34,17 @@ module R2
     presigner.presigned_url(:put_object, bucket:, key: object_key_for(shop_id, session_id, file_name), expires_in: EXPIRES_IN)
   end
 
-  def self.presigned_get_url(object_key)
-    presigner.presigned_url(:get_object, bucket:, key: object_key, expires_in: EXPIRES_IN)
+  def self.presigned_get_url(object_key, expires_in: EXPIRES_IN)
+    presigner.presigned_url(:get_object, bucket:, key: object_key, expires_in:)
+  end
+
+  # Installer builds live under their own prefix, well away from shops/<id>/incoming.
+  def self.agent_release_key(version) = "agent/#{version}/StampeziSetup.exe"
+
+  # Any key, unlike presigned_put_url above, which exists to serve one customer upload.
+  # The default window is short; a 230 MB release upload asks for a longer one.
+  def self.presigned_put(object_key, expires_in: EXPIRES_IN)
+    presigner.presigned_url(:put_object, bucket:, key: object_key, expires_in:)
   end
 
   # Size in bytes, or nil when the object isn't there.

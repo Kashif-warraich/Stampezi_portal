@@ -4,7 +4,7 @@ class Shop < ApplicationRecord
 
   validates :name, presence: true, length: { maximum: 120 }
 
-  def self.ransackable_attributes(_auth = nil) = %w[id name created_at updated_at]
+  def self.ransackable_attributes(_auth = nil) = %w[id name target_agent_version created_at updated_at]
   def self.ransackable_associations(_auth = nil) = %w[license upload_sessions]
 
   # A shop is meaningless without its licence, so the two rows are one transaction.

@@ -10,11 +10,25 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_20_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "agent_releases", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "notes"
+    t.string "object_key", null: false
+    t.datetime "pruned_at"
+    t.datetime "published_at"
+    t.string "sha256", null: false
+    t.bigint "size_bytes"
+    t.datetime "updated_at", null: false
+    t.string "version", null: false
+    t.index ["version"], name: "index_agent_releases_on_version", unique: true
+  end
+
   create_table "licenses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "agent_version"
     t.datetime "created_at", null: false
     t.datetime "expires_at", null: false
     t.datetime "last_check_at"
@@ -30,6 +44,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_150000) do
   create_table "shops", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
+    t.string "target_agent_version"
     t.datetime "updated_at", null: false
   end
 
