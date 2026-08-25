@@ -30,6 +30,20 @@ class AgentRelease < ApplicationRecord
   def installable? = published_at.present? && pruned_at.nil?
   def pruned?      = pruned_at.present?
 
+  def targeted_by = Shop.where(target_agent_version: version)
+
+  # Deleting a release a shop is pointed at would leave that shop asking the portal for a
+  # build nobody can serve, forever.
+  def deletable? = targeted_by.none?
+
+  # Removes the R2 object if it is still there. Safe to call twice.
+  def delete_object!
+    return if pruned?
+
+    R2.delete_object(object_key)
+    update!(pruned_at: Time.current)
+  end
+
   # Deletes the R2 object for every published release past the newest KEEP_OBJECTS. A
   # version some shop is still pointed at is never pruned, however old: doing so would
   # strand that shop with an update it can never download.

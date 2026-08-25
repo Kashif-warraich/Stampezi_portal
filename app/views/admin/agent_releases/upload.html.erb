@@ -1,0 +1,141 @@
+<style>
+  .release-upload { max-width: 40rem; }
+  .release-upload label { display: block; margin-bottom: 1rem; font-weight: 600; }
+  .release-upload input[type=text], .release-upload textarea { width: 100%; font-weight: 400; }
+  .release-upload .hint { font-weight: 400; color: #6b6b6b; font-size: .85em; }
+  .release-upload progress { width: 100%; height: 1.25rem; }
+  .release-upload .digest { font-family: monospace; font-size: .8em; word-break: break-all; }
+  .release-upload .bad { color: #a01c1c; }
+</style>
+
+<div class="panel">
+  <h3>Upload a release</h3>
+
+  <div class="panel_contents release-upload">
+    <p class="hint">
+      The installer goes straight from this browser to R2 &mdash; it never passes through the
+      portal. Publishing it rolls it out to nobody: point shops at it afterwards from
+      <%= link_to "Shops", admin_shops_path %> with the <em>Set target version</em> batch action.
+    </p>
+
+    <label>
+      Version
+      <input type="text" id="version" placeholder="1.0.1" autocomplete="off">
+      <span class="hint">Must match &lt;Version&gt; in Directory.Build.props, as N.N.N.</span>
+    </label>
+
+    <label>
+      Notes
+      <textarea id="notes" rows="3" placeholder="What changed in this build"></textarea>
+    </label>
+
+    <label>
+      Installer
+      <input type="file" id="file" accept=".exe">
+      <span class="hint">StampeziSetup.exe from <code>Stampezi_desktop\setup</code>.</span>
+    </label>
+
+    <p id="digest" class="digest"></p>
+    <progress id="progress" value="0" max="100" style="display:none"></progress>
+    <p id="status" aria-live="polite"></p>
+    <p id="error" class="bad" aria-live="polite"></p>
+
+    <button type="button" id="start" class="button">Upload and publish</button>
+  </div>
+</div>
+
+<script>
+  // Same three steps the build script takes (tools/publish-release.ps1): reserve a release,
+  // PUT the bytes straight to R2, confirm. The digest is computed here, on the machine
+  // holding the file, so what a shop verifies is a hash of the bytes that actually left.
+  (function () {
+    var version = document.getElementById("version");
+    var notes = document.getElementById("notes");
+    var file = document.getElementById("file");
+    var digest = document.getElementById("digest");
+    var progress = document.getElementById("progress");
+    var status = document.getElementById("status");
+    var error = document.getElementById("error");
+    var start = document.getElementById("start");
+
+    function fail(text) {
+      error.textContent = text;
+      status.textContent = "";
+      progress.style.display = "none";
+      start.disabled = false;
+    }
+
+    function toHex(buffer) {
+      return Array.prototype.map
+        .call(new Uint8Array(buffer), function (b) { return b.toString(16).padStart(2, "0"); })
+        .join("");
+    }
+
+    // XHR, not fetch: only XHR reports upload progress, and a 230 MB PUT with no progress
+    // bar looks like a hung page.
+    function put(url, body) {
+      return new Promise(function (resolve, reject) {
+        var request = new XMLHttpRequest();
+        request.open("PUT", url);
+        request.upload.onprogress = function (event) {
+          if (!event.lengthComputable) return;
+          progress.value = (event.loaded / event.total) * 100;
+          status.textContent = "Uploading " + Math.round(progress.value) + "%";
+        };
+        request.onload = function () {
+          if (request.status >= 200 && request.status < 300) resolve();
+          else reject(new Error("R2 refused the upload (" + request.status + ")"));
+        };
+        request.onerror = function () { reject(new Error("The upload failed. Check your connection.")); };
+        request.send(body);
+      });
+    }
+
+    async function postJson(url, body) {
+      var response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(body || {})
+      });
+      var payload = await response.json().catch(function () { return {}; });
+      if (!response.ok) throw new Error(payload.error || "Request failed (" + response.status + ")");
+      return payload;
+    }
+
+    start.addEventListener("click", async function () {
+      error.textContent = "";
+
+      var chosen = file.files && file.files[0];
+      if (!/^\d+\.\d+\.\d+$/.test(version.value.trim())) return fail("Version must look like 1.0.1.");
+      if (!chosen) return fail("Choose the installer to upload.");
+
+      start.disabled = true;
+      progress.style.display = "block";
+      progress.value = 0;
+
+      try {
+        status.textContent = "Hashing " + (chosen.size / 1048576).toFixed(0) + " MB…";
+        var sha256 = toHex(await crypto.subtle.digest("SHA-256", await chosen.arrayBuffer()));
+        digest.textContent = "sha256 " + sha256;
+
+        status.textContent = "Reserving the release…";
+        var slot = await postJson("/api/agent-releases", {
+          version: version.value.trim(),
+          sha256: sha256,
+          notes: notes.value
+        });
+
+        await put(slot.presignedPutUrl, chosen);
+
+        status.textContent = "Publishing…";
+        await postJson("/api/agent-releases/" + slot.id + "/publish");
+
+        status.textContent = "Published. Redirecting…";
+        window.location = "<%= admin_agent_releases_path %>";
+      } catch (e) {
+        fail(e.message || "Something went wrong.");
+      }
+    });
+  })();
+</script>
