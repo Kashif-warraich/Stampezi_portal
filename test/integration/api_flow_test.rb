@@ -72,4 +72,82 @@ class ApiFlowTest < ActionDispatch::IntegrationTest
     post "/api/upload-session", params: { fileName: "a.exe" }, as: :json
     assert_response :bad_request
   end
+
+  test "the upload page lets the customer pick more than one file" do
+    get "/upload", params: { l: @license }
+    follow_redirect!
+
+    assert_select "input#file[multiple]"
+  end
+
+  test "one QR cookie sends a whole batch, and the poll returns every file" do
+    get "/upload", params: { l: @license }
+
+    names = %w[a.pdf b.jpg c.docx]
+    names.each do |name|
+      post "/api/upload-session", params: { fileName: name }, as: :json
+      assert_response :success
+    end
+
+    # Every file in a batch gets its own session and its own object key, so nothing in it
+    # overwrites anything else in it.
+    sessions = UploadSession.where(shop: @shop)
+    assert_equal names.size, sessions.count
+    assert_equal names.size, sessions.map(&:object_key).uniq.size
+
+    sessions.update_all(status: "Uploaded")
+    get "/api/pending-files", params: { license: @license }
+    assert_equal names.sort, response.parsed_body["files"].map { |f| f["fileName"] }.sort
+  end
+
+  test "a failed download hands the claim back and the file returns to the poll" do
+    upload = UploadSession.create!(shop: @shop, status: "Uploaded", file_name: "a.pdf", object_key: "k")
+
+    post "/api/files/#{upload.id}/download-url", params: { license: @license }, as: :json
+    assert_response :success
+    get "/api/pending-files", params: { license: @license }
+    assert_empty response.parsed_body["files"]
+
+    post "/api/files/#{upload.id}/release", params: { license: @license }, as: :json
+    assert_response :success
+    assert_equal "Uploaded", upload.reload.status
+    assert_nil upload.delivered_at
+
+    get "/api/pending-files", params: { license: @license }
+    assert_equal [ upload.id ], response.parsed_body["files"].map { |f| f["id"] }
+
+    # A replayed release has nothing left to give back.
+    post "/api/files/#{upload.id}/release", params: { license: @license }, as: :json
+    assert_response :conflict
+  end
+
+  test "one shop cannot release another shop's claim" do
+    other = Shop.create_with_license!(name: "Other", months: 1)
+    upload = UploadSession.create!(shop: other, status: "Delivered", delivered_at: Time.current,
+                                   file_name: "a.pdf", object_key: "k")
+
+    post "/api/files/#{upload.id}/release", params: { license: @license }, as: :json
+    assert_response :conflict
+    assert_equal "Delivered", upload.reload.status
+  end
+
+  test "an expired licence stops delivery, but grace does not" do
+    upload = UploadSession.create!(shop: @shop, status: "Uploaded", file_name: "a.pdf", object_key: "k")
+
+    # Inside the five grace days the shop is warned, not cut off.
+    @shop.license.update!(expires_at: 2.days.ago)
+    get "/api/pending-files", params: { license: @license }
+    assert_response :success
+    assert_equal [ upload.id ], response.parsed_body["files"].map { |f| f["id"] }
+
+    @shop.license.update!(expires_at: (License::GRACE_DAYS + 1).days.ago)
+    get "/api/pending-files", params: { license: @license }
+    assert_response :forbidden
+    assert_equal "license-expired", response.parsed_body["error"]
+
+    # And the claim is refused too, so a cached session id is not a way around it.
+    post "/api/files/#{upload.id}/download-url", params: { license: @license }, as: :json
+    assert_response :forbidden
+    assert_equal "Uploaded", upload.reload.status
+  end
 end

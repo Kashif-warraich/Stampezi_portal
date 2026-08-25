@@ -3,16 +3,23 @@
 databases:
   - name: stampezi-db
     databaseName: stampezi
-    plan: basic-256mb
+    plan: free
 
 services:
   - type: web
     name: stampezi-portal
     runtime: ruby
-    plan: starter
-    buildCommand: bundle install && bundle exec rails assets:precompile
-    # Runs once per deploy, before traffic moves over - not on every process boot.
-    preDeployCommand: bundle exec rails db:migrate && bundle exec rails db:seed
+    plan: free
+    # Migrate and seed belong in a preDeployCommand, which the free plan does not offer, so
+    # they ride along at the end of the build. `&&` throughout: a failed migration must fail
+    # the deploy, not ship an app against the wrong schema. db:seed is a no-op once the
+    # admin exists.
+    buildCommand: >-
+      bundle install &&
+      bundle exec rails assets:precompile &&
+      bundle exec rails assets:clean &&
+      bundle exec rails db:migrate &&
+      bundle exec rails db:seed
     startCommand: bundle exec puma -C config/puma.rb
     healthCheckPath: /up
     envVars:

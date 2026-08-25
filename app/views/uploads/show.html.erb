@@ -1,28 +1,29 @@
-<% content_for :title, "Send a file to the shop" %>
+<% content_for :title, "Send files to the shop" %>
 <main class="narrow" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:1.5rem">
   <header>
-    <h1 style="margin-bottom:.25rem">Send a file to the shop</h1>
-    <p class="muted" style="margin:0">One file at a time, up to <%= UploadRules.max_megabytes %> MB.</p>
+    <h1 style="margin-bottom:.25rem">Send files to the shop</h1>
+    <p class="muted" style="margin:0">Pick as many as you like, up to <%= UploadRules.max_megabytes %> MB each.</p>
   </header>
 
   <section id="picker">
     <label class="dropzone">
-      <span id="picker-label" style="font-weight:500">Choose a file</span>
+      <span id="picker-label" style="font-weight:500">Choose files</span>
       <span class="muted" style="font-size:.75rem"><%= UploadRules::ALLOWED_EXTENSIONS.join(", ") %></span>
-      <input id="file" type="file"
+      <input id="file" type="file" multiple
              accept="<%= UploadRules::ALLOWED_EXTENSIONS.map { |e| ".#{e}" }.join(",") %>">
     </label>
     <p id="progress" class="muted break" style="font-size:.875rem" aria-live="polite"></p>
     <div id="error" style="display:none" aria-live="polite">
-      <p class="status-expired" id="error-text" style="font-size:.875rem"></p>
+      <p class="status-expired break" id="error-text" style="font-size:.875rem"></p>
       <button type="button" data-reset>Try again</button>
     </div>
   </section>
 
   <section id="done" class="card" style="display:none">
-    <p style="font-size:1.05rem;font-weight:500">Your file has been sent to the shop</p>
-    <p class="muted break" id="done-name" style="font-size:.875rem"></p>
-    <button type="button" data-reset>Send another file</button>
+    <p style="font-size:1.05rem;font-weight:500" id="done-title">Your file has been sent to the shop</p>
+    <p class="muted break" id="done-names" style="font-size:.875rem"></p>
+    <p class="status-expired break" id="done-failed" style="font-size:.875rem;display:none"></p>
+    <button type="button" data-reset>Send more files</button>
   </section>
 </main>
 
@@ -31,12 +32,13 @@
 </script>
 
 <script>
-  // The whole flow: ask for a slot, PUT straight to R2, tell the server it landed.
-  // The file never passes through this app, and this page never learns the licence
+  // The whole flow, once per file: ask for a slot, PUT straight to R2, tell the server it
+  // landed. The files never pass through this app, and this page never learns the licence
   // number - that rides along as an httpOnly cookie the QR link set.
   (function () {
     var config = JSON.parse(document.getElementById("upload-config").textContent);
     var maxMb = Math.round(config.maxBytes / (1024 * 1024));
+    var IDLE_LABEL = "Choose files";
 
     var input = document.getElementById("file");
     var picker = document.getElementById("picker");
@@ -45,11 +47,14 @@
     var errorBox = document.getElementById("error");
     var errorText = document.getElementById("error-text");
     var done = document.getElementById("done");
-    var doneName = document.getElementById("done-name");
+    var doneTitle = document.getElementById("done-title");
+    var doneNames = document.getElementById("done-names");
+    var doneFailed = document.getElementById("done-failed");
 
+    // Nothing landed - stay on the picker and say why.
     function fail(text) {
       progress.textContent = "";
-      pickerLabel.textContent = "Choose a file";
+      pickerLabel.textContent = IDLE_LABEL;
       input.disabled = false;
       errorText.textContent = text;
       errorBox.style.display = "block";
@@ -58,9 +63,10 @@
     function reset() {
       input.value = "";
       input.disabled = false;
-      pickerLabel.textContent = "Choose a file";
+      pickerLabel.textContent = IDLE_LABEL;
       progress.textContent = "";
       errorBox.style.display = "none";
+      doneFailed.style.display = "none";
       done.style.display = "none";
       picker.style.display = "block";
     }
@@ -74,53 +80,99 @@
       return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
     }
 
+    // Wording the customer can act on, as opposed to whatever fetch threw.
+    function friendly(message) {
+      var e = new Error(message);
+      e.friendly = true;
+      return e;
+    }
+
+    // One file, start to finish. An unauthorized flag aborts the whole batch: re-trying
+    // the rest without the cookie would just fail the same way.
+    async function send(file) {
+      var sessionResponse = await fetch("/api/upload-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fileName: file.name })
+      });
+
+      if (sessionResponse.status === 401 || sessionResponse.status === 404) {
+        var stale = friendly("scan the QR code again");
+        stale.unauthorized = true;
+        throw stale;
+      }
+      if (!sessionResponse.ok) throw friendly("that kind of file can't be sent");
+
+      var session = await sessionResponse.json();
+
+      var putResponse = await fetch(session.presignedPutUrl, { method: "PUT", body: file });
+      if (!putResponse.ok) throw friendly("the upload didn't finish");
+
+      var completeResponse = await fetch("/api/upload-complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: session.sessionId })
+      });
+      if (!completeResponse.ok) throw friendly("the upload didn't finish");
+    }
+
     input.addEventListener("change", async function () {
-      var file = input.files && input.files[0];
-      if (!file) return;
+      var chosen = Array.prototype.slice.call(input.files || []);
+      if (!chosen.length) return;
 
       errorBox.style.display = "none";
+      doneFailed.style.display = "none";
 
       // Same checks the server makes, so the phone fails fast instead of uploading first.
-      if (config.allowed.indexOf(extensionOf(file.name)) === -1) {
-        return fail("That kind of file can't be sent. Allowed: " + config.allowed.join(", ") + ".");
-      }
-      if (file.size > config.maxBytes) return fail("That file is too big. The limit is " + maxMb + " MB.");
-      if (file.size === 0) return fail("That file is empty. Please pick another one.");
+      // A bad file only takes itself out of the batch, never the ones beside it.
+      var queue = [];
+      var failed = [];
+      chosen.forEach(function (file) {
+        if (config.allowed.indexOf(extensionOf(file.name)) === -1) {
+          failed.push(file.name + " - that kind of file can't be sent");
+        } else if (file.size > config.maxBytes) {
+          failed.push(file.name + " - bigger than " + maxMb + " MB");
+        } else if (file.size === 0) {
+          failed.push(file.name + " - the file is empty");
+        } else {
+          queue.push(file);
+        }
+      });
+
+      if (!queue.length) return fail(failed.join(". ") + ".");
 
       input.disabled = true;
       pickerLabel.textContent = "Sending…";
-      progress.textContent = "Sending " + file.name + ". Keep this page open.";
 
-      try {
-        var sessionResponse = await fetch("/api/upload-session", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ fileName: file.name })
-        });
-
-        if (sessionResponse.status === 401 || sessionResponse.status === 404) {
-          return fail("Please scan the shop's QR code again to start.");
+      // One at a time. A phone on mobile data clears a queue faster than it clears five
+      // parallel uploads, the progress line stays honest, and a drop costs one file.
+      var sent = [];
+      for (var i = 0; i < queue.length; i++) {
+        progress.textContent = queue.length > 1
+          ? "Sending " + (i + 1) + " of " + queue.length + ": " + queue[i].name + ". Keep this page open."
+          : "Sending " + queue[i].name + ". Keep this page open.";
+        try {
+          await send(queue[i]);
+          sent.push(queue[i].name);
+        } catch (e) {
+          if (e && e.unauthorized) return fail("Please scan the shop's QR code again to start.");
+          failed.push(queue[i].name + " - " + (e && e.friendly ? e.message : "check your connection"));
         }
-        if (!sessionResponse.ok) return fail("That kind of file can't be sent. Please try a different file.");
-
-        var session = await sessionResponse.json();
-
-        var putResponse = await fetch(session.presignedPutUrl, { method: "PUT", body: file });
-        if (!putResponse.ok) return fail("The upload didn't finish. Please check your connection and try again.");
-
-        var completeResponse = await fetch("/api/upload-complete", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId: session.sessionId })
-        });
-        if (!completeResponse.ok) return fail("The upload didn't finish. Please try again.");
-
-        picker.style.display = "none";
-        doneName.textContent = file.name;
-        done.style.display = "block";
-      } catch (e) {
-        fail("Something went wrong. Please check your connection and try again.");
       }
+
+      if (!sent.length) return fail(failed.join(". ") + ".");
+
+      progress.textContent = "";
+      picker.style.display = "none";
+      doneTitle.textContent = sent.length === 1
+        ? "Your file has been sent to the shop"
+        : "Your " + sent.length + " files have been sent to the shop";
+      doneNames.textContent = sent.join(", ");
+      if (failed.length) {
+        doneFailed.textContent = "Not sent: " + failed.join(". ") + ".";
+        doneFailed.style.display = "block";
+      }
+      done.style.display = "block";
     });
   })();
 </script>

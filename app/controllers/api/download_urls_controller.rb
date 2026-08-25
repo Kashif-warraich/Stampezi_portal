@@ -13,6 +13,7 @@ module Api
 
       license = License.find_by(license_number:)
       return render_error("Licence not found", status: :not_found) if license.nil?
+      return if refuse_expired!(license)
 
       # The claim: one conditional UPDATE, so of two concurrent requests exactly one sees
       # changed == 1. A read-then-write pair would let both through.
@@ -45,6 +46,36 @@ module Api
         downloadUrl: R2.presigned_get_url(upload.object_key),
         expiresInSeconds: EXPIRES_IN_SECONDS
       }
+    end
+
+    # Hands a claim back when the desktop's download failed. Claiming marks the row Delivered
+    # up front so two pollers cannot both take it, which means a download that then dies -
+    # dropped connection, R2 timeout, service restart - would otherwise strand the file
+    # outside every future poll and lose the customer's job for good.
+    def release
+      session_id = params[:session_id]
+
+      license_number = license_param(params[:license])
+      return render_error("license (10 digits) is required", status: :bad_request) if license_number.nil?
+
+      license = License.find_by(license_number:)
+      return render_error("Licence not found", status: :not_found) if license.nil?
+
+      # Scoped to this shop's own recent claim. The delivery window bound stops a replayed
+      # release from resurrecting an old job the shop has long since printed, and clearing
+      # delivered_at keeps "delivered" meaning "actually reached a desktop".
+      now = Time.current
+      changed = UploadSession.where(id: session_id, shop_id: license.shop_id, status: "Delivered")
+                             .where(delivered_at: UploadSession::PENDING_WINDOW.ago..)
+                             .update_all(status: "Uploaded", delivered_at: nil, updated_at: now)
+
+      if changed.zero?
+        AppLog.info("download_url.release_ignored", sessionId: session_id, license: license_number)
+        return render_error("Nothing to release", status: :conflict)
+      end
+
+      AppLog.info("download_url.released", sessionId: session_id, license: license_number)
+      render json: { success: true }
     end
   end
 end

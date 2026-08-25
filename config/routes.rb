@@ -23,6 +23,8 @@ Rails.application.routes.draw do
     post "upload-complete", to: "upload_completions#create"
     get  "pending-files",   to: "pending_files#index"
     post "files/:session_id/download-url", to: "download_urls#create"
+    # Added after the deployed clients shipped, so an older desktop simply never calls it.
+    post "files/:session_id/release",      to: "download_urls#release"
   end
 
   get "up" => "rails/health#show", as: :rails_health_check

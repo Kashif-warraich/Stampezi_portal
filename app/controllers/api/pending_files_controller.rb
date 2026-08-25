@@ -7,6 +7,7 @@ module Api
 
       license = License.find_by(license_number:)
       return render_error("Licence not found", status: :not_found) if license.nil?
+      return if refuse_expired!(license)
 
       # Only "Uploaded" is ever returned, so a Delivered or Expired session cannot come back.
       files = UploadSession.pending_for(license.shop_id).map do |upload|
