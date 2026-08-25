@@ -1,0 +1,43 @@
+<%#
+  The staged rollout control. A plain form with checkboxes, because ActiveAdmin's batch
+  actions need its JavaScript and this app does not load it (Propshaft, no Sprockets, no
+  jQuery). Nothing here needs a script to work.
+%>
+<% if release.installable? %>
+  <%= form_tag roll_out_admin_agent_release_path(release) do %>
+    <p class="muted">
+      Tick the shops that should run <strong><%= release.version %></strong>. Unticking a shop
+      that is on it freezes that shop where it is &mdash; it does not roll it back. Each shop
+      picks the change up on its next licence check.
+    </p>
+
+    <table class="index_table">
+      <thead>
+        <tr><th></th><th>Shop</th><th>Running</th><th>Targeted at</th><th>Last check-in</th></tr>
+      </thead>
+      <tbody>
+        <% Shop.includes(:license).order(:name).each do |shop| %>
+          <tr>
+            <td>
+              <%= check_box_tag "shop_ids[]", shop.id, shop.target_agent_version == release.version,
+                    id: "shop_#{shop.id}" %>
+            </td>
+            <td><%= label_tag "shop_#{shop.id}", shop.name %></td>
+            <td><%= shop.license&.agent_version || "not reported" %></td>
+            <td><%= shop.target_agent_version || "frozen" %></td>
+            <td><%= shop.license&.last_check_at %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <div style="margin-top:1rem">
+      <%= submit_tag "Apply", class: "button" %>
+    </div>
+  <% end %>
+<% else %>
+  <p class="muted">
+    <%= release.pruned? ? "This build is no longer in R2, so nothing can be pointed at it."
+                        : "This build has not finished uploading yet." %>
+  </p>
+<% end %>

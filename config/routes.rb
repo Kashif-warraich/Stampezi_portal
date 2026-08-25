@@ -8,6 +8,11 @@ Rails.application.routes.draw do
   get    "/admin/login",  to: "sessions#new",     as: :login
   post   "/admin/login",  to: "sessions#create"
   delete "/admin/logout", to: "sessions#destroy", as: :logout
+  # ActiveAdmin renders its header logout as <a data-method="delete">, which needs
+  # jQuery-UJS to become a DELETE. This app runs Propshaft with no Sprockets and no jQuery,
+  # so that link did a plain GET, 404'd, and left the admin signed in. sessions#destroy only
+  # resets the session, so the worst a forged GET can do is sign someone out.
+  get "/admin/logout", to: "sessions#destroy"
 
   # /admin is ActiveAdmin (see app/admin/*.rb). The login routes above are declared
   # first so they win over the engine's own /admin paths.

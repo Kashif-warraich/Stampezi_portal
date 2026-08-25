@@ -127,7 +127,9 @@ ActiveAdmin.setup do |config|
   # link. For example :get, :delete, :put, etc..
   #
   # Default:
-  config.logout_link_method = :delete
+  # :get, not :delete - see the GET /admin/logout route. The DELETE link only worked with
+  # jQuery-UJS, which this app does not load.
+  config.logout_link_method = :get
 
   # == Root
   #

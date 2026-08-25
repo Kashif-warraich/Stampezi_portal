@@ -54,6 +54,13 @@ module R2
     nil
   end
 
+  # Server-side move: R2 copies the object within the bucket, so a 230 MB installer is
+  # renamed without a single byte crossing the network.
+  def self.move_object(from_key, to_key)
+    client.copy_object(bucket:, copy_source: "#{bucket}/#{from_key}", key: to_key)
+    delete_object(from_key)
+  end
+
   def self.delete_object(object_key)
     client.delete_object(bucket:, key: object_key)
   end

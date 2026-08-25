@@ -6,18 +6,9 @@ ActiveAdmin.register Shop do
   filter :name
   filter :created_at
 
-  # The rollout control. Select a handful of shops, set them at the new version, wait a
-  # day, then widen. Publishing a release arms nothing on its own - this does.
-  batch_action :set_target_version, form: -> {
-    { version: AgentRelease.newest_first(AgentRelease.installable).map(&:version) + [ [ "None (freeze)", "" ] ] }
-  } do |ids, inputs|
-    version = inputs[:version].presence
-    Shop.where(id: ids).update_all(target_agent_version: version, updated_at: Time.current)
-    AppLog.info("agent_update.rollout", version: version || "none", shops: ids.size)
-
-    redirect_to collection_path,
-      notice: version ? "#{ids.size} shop(s) targeted at #{version}" : "#{ids.size} shop(s) frozen"
-  end
+  # Rolling a version out lives on the release's own page (Releases -> a version -> Roll
+  # out). It used to be a batch action here, but ActiveAdmin's batch actions need its
+  # JavaScript, which this app does not load - so the control rendered and did nothing.
 
   index do
     selectable_column

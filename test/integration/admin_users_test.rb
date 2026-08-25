@@ -55,4 +55,17 @@ class AdminUsersTest < ActionDispatch::IntegrationTest
       delete "/admin/users/#{other.id}"
     end
   end
+
+  test "the header logout link actually signs you out without JavaScript" do
+    # It renders as a plain <a>; with no jQuery-UJS to turn it into a DELETE the browser
+    # just follows it, so the GET route has to work.
+    get "/admin/shops"
+    assert_select "a[href=?]", "/admin/logout"
+
+    get "/admin/logout"
+    assert_response :redirect
+
+    get "/admin/shops"
+    assert_redirected_to "/admin/login?next=%2Fadmin%2Fshops"
+  end
 end

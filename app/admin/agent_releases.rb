@@ -1,12 +1,10 @@
 ActiveAdmin.register AgentRelease do
   menu priority: 5, label: "Releases"
 
-  # No :new here - creating a release means moving 230 MB, which the Upload page does with
-  # a presigned PUT straight to R2. Only the notes are editable afterwards: the version, the
-  # object key and the digest describe bytes that already exist, and rewriting them would
-  # just make the row lie about what a shop is going to download.
+  # No :new - creating a release means moving 230 MB, which the Upload page does with a
+  # presigned PUT straight to R2.
   actions :index, :show, :edit, :update, :destroy
-  permit_params :notes
+  permit_params :version, :notes
 
   filter :version
   filter :created_at
@@ -15,8 +13,22 @@ ActiveAdmin.register AgentRelease do
   scope("Installable") { |scope| scope.published.where(pruned_at: nil) }
   scope("Pruned")      { |scope| scope.where.not(pruned_at: nil) }
 
+  # ActiveAdmin's stock Edit/Delete action items are <a data-method="delete"> links that
+  # need jQuery-UJS to work. This app runs Propshaft with no Sprockets and no jQuery, so
+  # that link quietly performed a GET and looked like it had done nothing. Replaced below
+  # with a link and a form button, neither of which needs JavaScript.
+  config.clear_action_items!
+
   action_item :upload, only: :index do
     link_to "Upload a release", upload_admin_agent_releases_path
+  end
+
+  action_item :edit, only: :show do
+    link_to "Edit", edit_admin_agent_release_path(resource)
+  end
+
+  action_item :destroy, only: :show do
+    render "admin/agent_releases/delete_button", release: resource
   end
 
   index do
@@ -30,7 +42,11 @@ ActiveAdmin.register AgentRelease do
     end
     column("Size") { |release| release.size_bytes ? "#{(release.size_bytes / 1024.0 / 1024).round} MB" : nil }
     column :published_at
-    actions
+    column("") do |release|
+      link_to("View", admin_agent_release_path(release), class: "member_link") +
+        link_to("Edit", edit_admin_agent_release_path(release), class: "member_link") +
+        render("admin/agent_releases/delete_button", release: release)
+    end
   end
 
   show do
@@ -46,19 +62,19 @@ ActiveAdmin.register AgentRelease do
       row :created_at
     end
 
-    panel "Shops targeted at this version" do
-      table_for resource.targeted_by.order(:name) do
-        column("Shop") { |shop| link_to shop.name, admin_shop_path(shop) }
-        column("Running") { |shop| shop.license&.agent_version || "not reported" }
-        column("Last check-in") { |shop| shop.license&.last_check_at }
-      end
+    panel "Roll out" do
+      render "admin/agent_releases/roll_out", release: resource
     end
   end
 
   form do |f|
     f.semantic_errors
-    f.inputs "Notes" do
-      f.input :notes, hint: "The version, digest and object key describe bytes already in R2 and cannot be edited."
+    f.inputs do
+      f.input :version,
+        hint: "Must match &lt;Version&gt; in the build this installer was made from. Renaming does not " \
+              "change what the exe reports, so this is for correcting a mistyped version, not for " \
+              "relabelling a build. The installer in R2 moves with it.".html_safe
+      f.input :notes
     end
     f.actions
   end
@@ -67,10 +83,59 @@ ActiveAdmin.register AgentRelease do
     # Renders app/views/admin/agent_releases/upload.html.erb.
   end
 
+  member_action :roll_out, method: :post do
+    release = resource
+    ids = Array(params[:shop_ids]).reject(&:blank?)
+
+    unless release.installable?
+      return redirect_to admin_agent_release_path(release), alert: "#{release.version} is not installable."
+    end
+
+    Shop.where(id: ids).update_all(target_agent_version: release.version, updated_at: Time.current)
+    # Unticked shops that were on this version are frozen where they are. Pointing them at
+    # something older would be a rollback, and that has to be an explicit choice.
+    Shop.where(target_agent_version: release.version).where.not(id: ids)
+        .update_all(target_agent_version: nil, updated_at: Time.current)
+
+    AppLog.info("agent_update.rollout", version: release.version, shops: ids.size)
+    redirect_to admin_agent_release_path(release),
+      notice: "#{ids.size} shop(s) now targeted at #{release.version}"
+  end
+
   controller do
-    # Deleting a release takes its installer out of R2 with it - the row alone is of no use
-    # to anyone, and leaving the object behind is exactly the storage the pruning exists to
-    # reclaim.
+    # The object key embeds the version, so a rename has to move the installer too or the
+    # row and the bytes stop describing each other.
+    def update
+      release = resource
+      requested = params[:agent_release] || {}
+      wanted = requested[:version].to_s.strip
+
+      return super if wanted.blank? || wanted == release.version
+
+      if release.targeted_by.any?
+        return redirect_to edit_admin_agent_release_path(release),
+          alert: "#{release.targeted_by.count} shop(s) are targeted at #{release.version}. Point them elsewhere before renaming it."
+      end
+
+      was = release.version
+      old_key = release.object_key
+      release.assign_attributes(
+        version: wanted, object_key: R2.agent_release_key(wanted), notes: requested[:notes])
+
+      unless release.valid?
+        return redirect_to edit_admin_agent_release_path(release),
+          alert: release.errors.full_messages.to_sentence
+      end
+
+      R2.move_object(old_key, release.object_key) unless release.pruned?
+      release.save!
+      AppLog.info("agent_release.renamed", from: was, to: wanted)
+
+      redirect_to admin_agent_release_path(release), notice: "Renamed #{was} to #{wanted}"
+    end
+
+    # Deleting a release takes its installer out of R2 with it: the row alone is of no use,
+    # and the object is exactly the storage pruning exists to reclaim.
     def destroy
       release = resource
 
