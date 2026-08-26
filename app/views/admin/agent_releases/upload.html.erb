@@ -1,47 +1,39 @@
-<style>
-  .release-upload { max-width: 40rem; }
-  .release-upload label { display: block; margin-bottom: 1rem; font-weight: 600; }
-  .release-upload input[type=text], .release-upload textarea { width: 100%; font-weight: 400; }
-  .release-upload .hint { font-weight: 400; color: #6b6b6b; font-size: .85em; }
-  .release-upload progress { width: 100%; height: 1.25rem; }
-  .release-upload .digest { font-family: monospace; font-size: .8em; word-break: break-all; }
-  .release-upload .bad { color: #a01c1c; }
-</style>
+<% content_for :title, "Upload a release · Stampezi" %>
 
-<div class="panel">
-  <h3>Upload a release</h3>
-
-  <div class="panel_contents release-upload">
-    <p class="hint">
-      The installer goes straight from this browser to R2 &mdash; it never passes through the
-      portal. Publishing it rolls it out to nobody: point shops at it afterwards from
-      <%= link_to "Shops", admin_shops_path %> with the <em>Set target version</em> batch action.
-    </p>
-
-    <label>
-      Version
-      <input type="text" id="version" placeholder="1.0.1" autocomplete="off">
-      <span class="hint">Must match &lt;Version&gt; in Directory.Build.props, as N.N.N.</span>
-    </label>
-
-    <label>
-      Notes
-      <textarea id="notes" rows="3" placeholder="What changed in this build"></textarea>
-    </label>
-
-    <label>
-      Installer
-      <input type="file" id="file" accept=".exe">
-      <span class="hint">StampeziSetup.exe from <code>Stampezi_desktop\setup</code>.</span>
-    </label>
-
-    <p id="digest" class="digest"></p>
-    <progress id="progress" value="0" max="100" style="display:none"></progress>
-    <p id="status" aria-live="polite"></p>
-    <p id="error" class="bad" aria-live="polite"></p>
-
-    <button type="button" id="start" class="button">Upload and publish</button>
+<header class="page-head">
+  <div>
+    <div class="kicker">Distribution</div>
+    <h1>Upload a release</h1>
   </div>
+</header>
+
+<div class="card pad" style="max-width: 640px;">
+  <p class="card-hint">
+    The installer goes straight from this browser to R2 &mdash; it never passes through the
+    portal. Publishing it rolls it out to nobody: point shops at it afterwards from the
+    release's own page.
+  </p>
+
+  <label class="field">Version
+    <input type="text" id="version" placeholder="1.0.1" autocomplete="off" class="mono">
+    <span class="hint">Must match &lt;Version&gt; in Directory.Build.props, as N.N.N.</span>
+  </label>
+
+  <label class="field">Notes
+    <textarea id="notes" rows="3" placeholder="What changed in this build"></textarea>
+  </label>
+
+  <label class="field">Installer
+    <input type="file" id="file" accept=".exe">
+    <span class="hint">StampeziSetup.exe from <code>Stampezi_desktop\setup</code>.</span>
+  </label>
+
+  <p id="digest" class="mono dim break"></p>
+  <progress id="progress" value="0" max="100" style="display:none; width: 100%; height: 1.25rem;"></progress>
+  <p id="status" aria-live="polite"></p>
+  <p id="error" aria-live="polite" style="color: var(--red-deep); font-weight: 600;"></p>
+
+  <button type="button" id="start" class="btn btn-primary">Upload and publish</button>
 </div>
 
 <script>

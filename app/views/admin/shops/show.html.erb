@@ -1,0 +1,100 @@
+<% content_for :title, "#{@shop.name} · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Directory / Shop</div>
+    <h1><%= @shop.name %></h1>
+  </div>
+  <div class="page-actions">
+    <% if @shop.license %>
+      <%= link_to "Download QR", qr_admin_shop_path(@shop), class: "btn" %>
+    <% end %>
+    <%= link_to "Edit", edit_admin_shop_path(@shop), class: "btn" %>
+    <%= button_to "Delete", admin_shop_path(@shop), method: :delete, class: "btn btn-danger",
+          form: { data: { confirm_title: "Delete this shop?", confirm_cta: "Delete shop",
+                          confirm: "#{@shop.name}, its licence and its upload history will be removed permanently. This cannot be undone." } } %>
+  </div>
+</header>
+
+<div class="grid-2">
+  <section class="card pad">
+    <h2 class="card-title">Details</h2>
+    <p class="card-hint">The shop record itself.</p>
+    <dl class="kv">
+      <div><dt>Name</dt><dd class="strong"><%= @shop.name %></dd></div>
+      <div><dt>Status</dt><dd><%= status_badge @shop.status %></dd></div>
+      <div><dt>Created</dt><dd><%= fmt_time @shop.created_at %></dd></div>
+      <div><dt>Agent</dt><dd><%= agent_badge @shop %></dd></div>
+    </dl>
+  </section>
+
+  <section class="card pad">
+    <h2 class="card-title">Licence</h2>
+    <% if (licence = @shop.license) %>
+      <p class="card-hint">Fixed for the life of the shop; expiry moves through Extend.</p>
+      <dl class="kv">
+        <div><dt>Number</dt><dd class="mono"><%= licence.license_number %></dd></div>
+        <div><dt>Status</dt><dd><%= status_badge licence.status %></dd></div>
+        <div><dt>Grace days remaining</dt><dd><%= licence.grace_days_remaining %></dd></div>
+        <div><dt>Expires</dt><dd><%= fmt_time licence.expires_at %></dd></div>
+        <div><dt>Machine</dt><dd class="mono break"><%= licence.machine_fingerprint || "not bound" %></dd></div>
+        <div><dt>Last check-in</dt><dd><%= fmt_time licence.last_check_at %></dd></div>
+        <div><dt>Last binding reset</dt><dd><%= fmt_time licence.last_reset_at %></dd></div>
+        <div><dt>Agent version running</dt><dd class="mono"><%= licence.agent_version || "not reported" %></dd></div>
+        <div><dt>Agent version targeted</dt><dd class="mono"><%= @shop.target_agent_version || "none (frozen)" %></dd></div>
+      </dl>
+
+      <div class="divider"></div>
+
+      <%= form_with url: extend_license_admin_shop_path(@shop), method: :post do %>
+        <div class="field-row">
+          <label class="field">Extend by (months)
+            <%= number_field_tag :months, 1, min: 1, max: 120, style: "width: 6rem" %>
+          </label>
+          <%= submit_tag "Extend", class: "btn" %>
+        </div>
+      <% end %>
+
+      <div class="divider"></div>
+
+      <p class="card-hint">
+        Clears the bound machine so the shop can reinstall on a new PC. Allowed once every 30 days.
+      </p>
+      <%= button_to "Reset machine binding", reset_binding_admin_shop_path(@shop), method: :post,
+            class: "btn btn-danger",
+            form: { data: { confirm_title: "Reset machine binding?", confirm_cta: "Reset binding",
+                            confirm: "The machine bound to #{@shop.name} will be cleared. The next PC to check in claims the licence." } } %>
+    <% else %>
+      <p class="card-hint">This shop has no licence.</p>
+    <% end %>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h2 class="card-title">Uploads</h2>
+    <span class="dim">latest 25</span>
+  </div>
+  <% if @uploads.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Received</th><th>Delivered</th></tr></thead>
+        <tbody>
+          <% @uploads.each do |upload| %>
+            <tr>
+              <td class="strong"><%= upload.file_name %></td>
+              <td><%= status_badge upload.status %></td>
+              <td><%= fmt_time upload.created_at %></td>
+              <td><%= fmt_time upload.delivered_at %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="empty">
+      <div class="empty-title">No uploads yet</div>
+      <div class="empty-hint">Files appear here when customers scan this shop's QR code.</div>
+    </div>
+  <% end %>
+</section>

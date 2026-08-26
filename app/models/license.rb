@@ -30,7 +30,9 @@ class License < ApplicationRecord
   end
 
   # Days of grace left after expiry: full 5 on the expiry day, 0 once burned through.
+  # A deactivated shop gets none - grace is for late payers, not switched-off shops.
   def grace_days_remaining(now = Time.current)
+    return 0 unless shop.active?
     return GRACE_DAYS if expires_at > now
 
     [ GRACE_DAYS - ((now - expires_at) / 1.day).floor, 0 ].max
@@ -44,8 +46,11 @@ class License < ApplicationRecord
   end
 
   # What the desktop service is told. Same three states, but an unexpired licence reads
-  # "valid" here - the deployed .NET client matches on that exact string.
+  # "valid" here - the deployed .NET client matches on that exact string. An inactive shop
+  # reads "expired" whatever the expiry date, so deactivating a shop in the portal stops
+  # its desktop on the next check - and refuse_expired! then blocks its file endpoints too.
   def check_status(now = Time.current)
+    return "expired" unless shop.active?
     return "valid" if expires_at > now
 
     grace_days_remaining(now).positive? ? "grace" : "expired"

@@ -1,6 +1,5 @@
 Rails.application.routes.draw do
-  ActiveAdmin.routes(self)
-  root to: redirect("/admin/shops")
+  root to: redirect("/admin")
 
   # Public: the QR code points here with ?l=<licence>.
   get "/upload", to: "uploads#show", as: :upload
@@ -8,14 +7,34 @@ Rails.application.routes.draw do
   get    "/admin/login",  to: "sessions#new",     as: :login
   post   "/admin/login",  to: "sessions#create"
   delete "/admin/logout", to: "sessions#destroy", as: :logout
-  # ActiveAdmin renders its header logout as <a data-method="delete">, which needs
-  # jQuery-UJS to become a DELETE. This app runs Propshaft with no Sprockets and no jQuery,
-  # so that link did a plain GET, 404'd, and left the admin signed in. sessions#destroy only
-  # resets the session, so the worst a forged GET can do is sign someone out.
+  # The sidebar's Sign out is a plain link (no JavaScript is loaded), so it performs a GET.
+  # sessions#destroy only resets the session, so the worst a forged GET can do is sign
+  # someone out.
   get "/admin/logout", to: "sessions#destroy"
 
-  # /admin is ActiveAdmin (see app/admin/*.rb). The login routes above are declared
-  # first so they win over the engine's own /admin paths.
+  # The admin back office (app/controllers/admin). The login routes above are declared
+  # first so they win over /admin/:id-style routes.
+  namespace :admin do
+    root to: "dashboard#index"
+
+    resources :shops do
+      member do
+        get  :qr
+        post :extend_license
+        post :reset_binding
+      end
+    end
+
+    # No :new/:create - creating a release means moving 230 MB, which the upload page does
+    # with a presigned PUT straight to R2.
+    resources :agent_releases, only: %i[index show edit update destroy] do
+      get  :upload,   on: :collection
+      post :roll_out, on: :member
+    end
+
+    resources :users, except: %i[show]
+  end
+
   # Paths are fixed by the deployed .NET desktop service - do not rename them.
   namespace :api do
     resources :shops, only: %i[index create show update]

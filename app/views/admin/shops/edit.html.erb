@@ -1,0 +1,41 @@
+<% content_for :title, "Edit #{@shop.name} · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Directory / Shop</div>
+    <h1>Edit <%= @shop.name %></h1>
+  </div>
+</header>
+
+<div class="card pad form-card">
+  <% if flash.now[:alert] %>
+    <div class="alert-box"><b>!</b><span><%= flash.now[:alert] %></span></div>
+  <% end %>
+
+  <%= form_with model: [ :admin, @shop ] do |f| %>
+    <label class="field">Shop name
+      <%= f.text_field :name, required: true, autofocus: true %>
+    </label>
+
+    <% if @shop.license %>
+      <label class="field">Licence expires on
+        <%= date_field_tag "shop[license_expires_on]", @shop.license.expires_at.to_date %>
+        <span class="hint">
+          Licence <span class="mono"><%= @shop.license.license_number %></span> &mdash; the number
+          never changes. The licence runs to the end of the chosen day.
+        </span>
+      </label>
+    <% end %>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Shop is active</div>
+        <div class="hint">An inactive shop shows as such across the portal.</div>
+      </div>
+      <%= f.check_box :active, class: "switch" %>
+    </div>
+
+    <%= f.submit "Save changes", class: "btn btn-primary" %>
+    <%= link_to "Cancel", admin_shop_path(@shop), class: "btn" %>
+  <% end %>
+</div>

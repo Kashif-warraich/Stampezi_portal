@@ -1,0 +1,30 @@
+<% content_for :title, "Edit release #{@release.version} · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Distribution / Release</div>
+    <h1>Edit <%= @release.version %></h1>
+  </div>
+</header>
+
+<div class="card pad form-card">
+  <% if flash.now[:alert] %>
+    <div class="alert-box"><b>!</b><span><%= flash.now[:alert] %></span></div>
+  <% end %>
+
+  <%= form_with model: [ :admin, @release ] do |f| %>
+    <label class="field">Version
+      <%= f.text_field :version, class: "mono" %>
+      <span class="hint">
+        Must match &lt;Version&gt; in the build this installer was made from. Renaming does not
+        change what the exe reports, so this is for correcting a mistyped version, not for
+        relabelling a build. The installer in R2 moves with it.
+      </span>
+    </label>
+    <label class="field">Notes
+      <%= f.text_area :notes, rows: 3, placeholder: "What changed in this build" %>
+    </label>
+    <%= f.submit "Save changes", class: "btn btn-primary" %>
+    <%= link_to "Cancel", admin_agent_release_path(@release), class: "btn" %>
+  <% end %>
+</div>

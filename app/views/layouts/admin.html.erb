@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= content_for(:title) || "Stampezi admin" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <%= stylesheet_link_tag "admin" %>
+  </head>
+
+  <body>
+    <% if signed_in? %>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">
+            <span class="brand-mark">S</span>
+            <span class="brand-name">Stampezi</span>
+          </div>
+          <nav>
+            <%= nav_item "01", "Dashboard", admin_root_path, %w[dashboard] %>
+            <%= nav_item "02", "Shops", admin_shops_path, %w[shops] %>
+            <%= nav_item "03", "Releases", admin_agent_releases_path, %w[agent_releases] %>
+            <%= nav_item "04", "Admin users", admin_users_path, %w[users] %>
+          </nav>
+          <div class="sidebar-foot">
+            <div class="me">
+              <span class="avatar"><%= current_user.email.first(2).upcase %></span>
+              <span class="me-name"><%= current_user.email %></span>
+            </div>
+            <%# A plain link: GET /admin/logout works with no JavaScript loaded. %>
+            <%= link_to "Sign out", logout_path, class: "signout" %>
+          </div>
+        </aside>
+
+        <main class="main">
+          <%= yield %>
+        </main>
+      </div>
+
+      <div class="toasts">
+        <% { notice: "ok", alert: "bad" }.each do |key, kind| %>
+          <% if flash[key] %>
+            <div class="toast toast-<%= kind %>">
+              <span class="toast-icon"><%= kind == "ok" ? "✓" : "!" %></span>
+              <span class="toast-text"><%= flash[key] %></span>
+              <button type="button" onclick="this.closest('.toast').remove()" aria-label="Dismiss">×</button>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+
+      <dialog id="confirm-dialog">
+        <div class="confirm-icon">!</div>
+        <div class="confirm-title"></div>
+        <div class="confirm-body"></div>
+        <div class="confirm-actions">
+          <form method="dialog"><button class="btn">Cancel</button></form>
+          <button type="button" class="btn-confirm" id="confirm-accept">Confirm</button>
+        </div>
+      </dialog>
+      <script>
+        // Forms carrying data-confirm get the styled dialog instead of window.confirm.
+        // With JavaScript off the form just submits, same as before this dialog existed.
+        (function () {
+          var dialog = document.getElementById("confirm-dialog");
+          if (!dialog || !dialog.showModal) return;
+          document.addEventListener("submit", function (event) {
+            var form = event.target;
+            if (!form.dataset || !form.dataset.confirm || form.dataset.confirmed) return;
+            event.preventDefault();
+            dialog.querySelector(".confirm-title").textContent = form.dataset.confirmTitle || "Are you sure?";
+            dialog.querySelector(".confirm-body").textContent = form.dataset.confirm;
+            var accept = document.getElementById("confirm-accept");
+            accept.textContent = form.dataset.confirmCta || "Confirm";
+            accept.onclick = function () {
+              dialog.close();
+              form.dataset.confirmed = "1";
+              form.requestSubmit ? form.requestSubmit() : form.submit();
+            };
+            dialog.showModal();
+          });
+        })();
+      </script>
+    <% else %>
+      <%= yield %>
+    <% end %>
+  </body>
+</html>

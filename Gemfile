@@ -18,14 +18,6 @@ gem "stimulus-rails"
 # Admin password hashing for the User model.
 gem "bcrypt", "~> 3.1.7"
 
-# The admin back office: one file per model gives full CRUD, filters and search.
-# Installed with --skip-users, so it authenticates through the existing User model
-# and session rather than pulling in Devise.
-gem "activeadmin", "~> 3.5"
-# ActiveAdmin ships Sass sources only. dartsass-rails compiles them and, unlike
-# sassc-rails, does not drag Sprockets in alongside Rails 8's Propshaft.
-gem "dartsass-rails"
-
 # Server-side QR codes for the shop counter cards (the Next portal drew these in the
 # browser with a canvas; a PNG endpoint is simpler and prints the same).
 gem "rqrcode", "~> 3.0"

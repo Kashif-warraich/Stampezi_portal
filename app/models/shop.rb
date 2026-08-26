@@ -4,6 +4,13 @@ class Shop < ApplicationRecord
 
   validates :name, presence: true, length: { maximum: 120 }
 
+  # What the admin UI shows: an admin switching the shop off wins over licence expiry.
+  def status
+    return "inactive" unless active?
+
+    license&.status || "no licence"
+  end
+
   def self.ransackable_attributes(_auth = nil) = %w[id name target_agent_version created_at updated_at]
   def self.ransackable_associations(_auth = nil) = %w[license upload_sessions]
 

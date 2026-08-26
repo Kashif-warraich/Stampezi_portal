@@ -1,0 +1,27 @@
+<% content_for :title, "New shop · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Directory</div>
+    <h1>New shop</h1>
+  </div>
+</header>
+
+<div class="card pad form-card">
+  <p class="card-hint">The shop and its licence are created together; the licence number is generated.</p>
+
+  <% if flash.now[:alert] %>
+    <div class="alert-box"><b>!</b><span><%= flash.now[:alert] %></span></div>
+  <% end %>
+
+  <%= form_with url: admin_shops_path, scope: :shop do |f| %>
+    <label class="field">Shop name
+      <%= f.text_field :name, required: true, autofocus: true, placeholder: "Nordvest Elektronik" %>
+    </label>
+    <label class="field">Initial licence (months)
+      <%= f.number_field :months, value: 1, min: 1, max: 120 %>
+    </label>
+    <%= f.submit "Create shop", class: "btn btn-primary" %>
+    <%= link_to "Cancel", admin_shops_path, class: "btn" %>
+  <% end %>
+</div>

@@ -1,0 +1,61 @@
+<% content_for :title, "Releases · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Distribution</div>
+    <h1>Releases</h1>
+  </div>
+  <div class="page-actions">
+    <%= link_to "+ Upload a release", upload_admin_agent_releases_path, class: "btn btn-primary" %>
+  </div>
+</header>
+
+<div class="card">
+  <div class="toolbar">
+    <%= form_with url: admin_agent_releases_path, method: :get, class: "search" do %>
+      <%= hidden_field_tag :filter, @filter %>
+      <%= search_field_tag :q, @q, placeholder: "Search releases by version" %>
+    <% end %>
+    <div class="chips">
+      <% Admin::AgentReleasesController::FILTERS.each do |f| %>
+        <%= link_to f.capitalize, admin_agent_releases_path(q: @q.presence, filter: f),
+              class: "chip#{' active' if @filter == f}" %>
+      <% end %>
+    </div>
+    <span class="count mono"><%= @releases.size %> of <%= @total %></span>
+  </div>
+
+  <% if @releases.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Version</th><th>Shops on it</th><th>State</th><th>Size</th><th>Published</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% @releases.each do |release| %>
+            <tr>
+              <td><%= link_to release.version, admin_agent_release_path(release), class: "mono strong" %></td>
+              <td><%= release.targeted_by.count %></td>
+              <td><%= release_state_badge release %></td>
+              <td class="mono dim"><%= release_size release %></td>
+              <td><%= fmt_time release.published_at %></td>
+              <td class="row-actions">
+                <%= link_to "Edit", edit_admin_agent_release_path(release), class: "btn btn-sm" %>
+                <%= button_to "Delete", admin_agent_release_path(release), method: :delete, class: "btn btn-sm btn-danger",
+                      form: { data: { confirm_title: "Delete this release?", confirm_cta: "Delete release",
+                                      confirm: "#{release.version} will be removed and its installer deleted from R2. This cannot be undone." } } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="empty">
+      <div class="empty-title">Nothing here yet</div>
+      <div class="empty-hint">
+        <%= @q.present? || @filter != "all" ? "No releases match this search or filter." : "Upload the first installer to get started." %>
+      </div>
+    </div>
+  <% end %>
+</div>

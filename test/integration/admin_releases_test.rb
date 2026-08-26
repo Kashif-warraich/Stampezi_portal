@@ -100,8 +100,8 @@ class AdminReleasesTest < ActionDispatch::IntegrationTest
     release = upload!("1.0.0")
     get "/admin/agent_releases/#{release.id}"
 
-    # ActiveAdmin's stock <a data-method="delete"> needs jQuery-UJS, which this app does
-    # not load; it performed a GET and looked like it had done nothing.
+    # A <a data-method="delete"> would need jQuery-UJS, which this app does not load; it
+    # would perform a GET and look like it had done nothing. button_to renders a real form.
     assert_select "form[action=?][method=post]", "/admin/agent_releases/#{release.id}" do
       assert_select "input[name=_method][value=delete]", 1
     end

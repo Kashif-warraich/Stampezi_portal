@@ -1,0 +1,73 @@
+<% content_for :title, "Release #{@release.version} · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Distribution / Release</div>
+    <h1><%= @release.version %></h1>
+  </div>
+  <div class="page-actions">
+    <%= link_to "Edit", edit_admin_agent_release_path(@release), class: "btn" %>
+    <%= button_to "Delete", admin_agent_release_path(@release), method: :delete, class: "btn btn-danger",
+          form: { data: { confirm_title: "Delete this release?", confirm_cta: "Delete release",
+                          confirm: "#{@release.version} will be removed and its installer deleted from R2. This cannot be undone." } } %>
+  </div>
+</header>
+
+<section class="card pad">
+  <h2 class="card-title">Details</h2>
+  <dl class="kv">
+    <div><dt>Version</dt><dd class="mono"><%= @release.version %></dd></div>
+    <div><dt>State</dt><dd><%= release_state_badge @release %></dd></div>
+    <div><dt>Size</dt><dd class="mono"><%= release_size @release %></dd></div>
+    <div><dt>Object key</dt><dd class="mono break"><%= @release.object_key %></dd></div>
+    <div><dt>SHA-256</dt><dd class="mono break"><%= @release.sha256 %></dd></div>
+    <div><dt>Notes</dt><dd><%= @release.notes.presence || tag.span("—", class: "dim") %></dd></div>
+    <div><dt>Published</dt><dd><%= fmt_time @release.published_at %></dd></div>
+    <div><dt>Pruned from R2</dt><dd><%= fmt_time @release.pruned_at %></dd></div>
+    <div><dt>Created</dt><dd><%= fmt_time @release.created_at %></dd></div>
+  </dl>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2 class="card-title">Roll out</h2>
+  </div>
+  <% if @release.installable? %>
+    <%= form_with url: roll_out_admin_agent_release_path(@release), method: :post do %>
+      <p class="card-hint" style="padding: 14px 18px 0;">
+        Tick the shops that should run <strong><%= @release.version %></strong>. Unticking a shop
+        that is on it freezes that shop where it is &mdash; it does not roll it back. Each shop
+        picks the change up on its next licence check.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th>Shop</th><th>Running</th><th>Targeted at</th><th>Last check-in</th></tr>
+          </thead>
+          <tbody>
+            <% @shops.each do |shop| %>
+              <tr>
+                <td>
+                  <%= check_box_tag "shop_ids[]", shop.id, shop.target_agent_version == @release.version,
+                        id: "shop_#{shop.id}" %>
+                </td>
+                <td><%= label_tag "shop_#{shop.id}", shop.name, class: "strong" %></td>
+                <td class="mono dim"><%= shop.license&.agent_version || "not reported" %></td>
+                <td class="mono dim"><%= shop.target_agent_version || "frozen" %></td>
+                <td><%= fmt_time shop.license&.last_check_at %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding: 14px 18px 18px;">
+        <%= submit_tag "Apply", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  <% else %>
+    <p class="card-hint" style="padding: 14px 18px 18px; margin: 0;">
+      <%= @release.pruned? ? "This build is no longer in R2, so nothing can be pointed at it."
+                           : "This build has not finished uploading yet." %>
+    </p>
+  <% end %>
+</section>

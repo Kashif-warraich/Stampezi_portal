@@ -1,0 +1,20 @@
+<% if flash.now[:alert] %>
+  <div class="alert-box"><b>!</b><span><%= flash.now[:alert] %></span></div>
+<% end %>
+
+<%= form_with model: [ :admin, user ] do |f| %>
+  <label class="field">Email
+    <%= f.email_field :email, required: true, autocomplete: "username", autofocus: true %>
+  </label>
+  <label class="field">Password
+    <%= f.password_field :password, autocomplete: "new-password" %>
+    <% if user.persisted? %>
+      <span class="hint">Leave blank to keep the current password.</span>
+    <% end %>
+  </label>
+  <label class="field">Password confirmation
+    <%= f.password_field :password_confirmation, autocomplete: "new-password" %>
+  </label>
+  <%= f.submit user.persisted? ? "Save changes" : "Create admin user", class: "btn btn-primary" %>
+  <%= link_to "Cancel", admin_users_path, class: "btn" %>
+<% end %>

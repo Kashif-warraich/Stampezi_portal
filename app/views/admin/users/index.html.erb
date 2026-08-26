@@ -1,0 +1,45 @@
+<% content_for :title, "Admin users · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Access</div>
+    <h1>Admin users</h1>
+  </div>
+  <div class="page-actions">
+    <%= link_to "+ New admin user", new_admin_user_path, class: "btn btn-primary" %>
+  </div>
+</header>
+
+<div class="card">
+  <% if @users.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Email</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+          <% @users.each do |user| %>
+            <tr>
+              <td>
+                <span class="strong"><%= user.email %></span>
+                <% if user == current_user %><span class="badge badge-muted">you</span><% end %>
+              </td>
+              <td><%= fmt_time user.created_at %></td>
+              <td class="row-actions">
+                <%= link_to "Edit", edit_admin_user_path(user), class: "btn btn-sm" %>
+                <% unless user == current_user %>
+                  <%= button_to "Delete", admin_user_path(user), method: :delete, class: "btn btn-sm btn-danger",
+                        form: { data: { confirm_title: "Delete this admin user?", confirm_cta: "Delete user",
+                                        confirm: "#{user.email} will lose access to this portal permanently." } } %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="empty">
+      <div class="empty-title">Nothing here yet</div>
+      <div class="empty-hint">Add an admin user to share access.</div>
+    </div>
+  <% end %>
+</div>

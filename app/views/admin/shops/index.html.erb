@@ -1,0 +1,69 @@
+<% content_for :title, "Shops · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Directory</div>
+    <h1>Shops</h1>
+  </div>
+  <div class="page-actions">
+    <%= link_to "+ New shop", new_admin_shop_path, class: "btn btn-primary" %>
+  </div>
+</header>
+
+<div class="card">
+  <div class="toolbar">
+    <%= form_with url: admin_shops_path, method: :get, class: "search" do %>
+      <%= hidden_field_tag :filter, @filter %>
+      <%= search_field_tag :q, @q, placeholder: "Search shops by name" %>
+    <% end %>
+    <div class="chips">
+      <% Admin::ShopsController::FILTERS.each do |f| %>
+        <%= link_to f.capitalize, admin_shops_path(q: @q.presence, filter: f),
+              class: "chip#{' active' if @filter == f}" %>
+      <% end %>
+    </div>
+    <span class="count mono"><%= @shops.size %> of <%= @total %></span>
+  </div>
+
+  <% if @shops.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Shop</th><th>Licence no.</th><th>Status</th><th>Expires</th>
+            <th>Last check-in</th><th>Agent</th><th>QR</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @shops.each do |shop| %>
+            <tr>
+              <td>
+                <%= link_to shop.name, admin_shop_path(shop), class: "strong" %>
+                <div class="cell-sub">since <%= shop.created_at.strftime("%Y-%m-%d") %></div>
+              </td>
+              <td class="mono"><%= shop.license&.license_number || "—" %></td>
+              <td><%= status_badge shop.status %></td>
+              <td><%= fmt_date shop.license&.expires_at %></td>
+              <td><%= fmt_time shop.license&.last_check_at %></td>
+              <td><%= agent_badge shop %></td>
+              <td><%= shop.license ? link_to("Download", qr_admin_shop_path(shop)) : "—" %></td>
+              <td class="row-actions">
+                <%= link_to "Edit", edit_admin_shop_path(shop), class: "btn btn-sm" %>
+                <%= button_to "Delete", admin_shop_path(shop), method: :delete, class: "btn btn-sm btn-danger",
+                      form: { data: { confirm_title: "Delete this shop?", confirm_cta: "Delete shop",
+                                      confirm: "#{shop.name}, its licence and its upload history will be removed permanently. This cannot be undone." } } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="empty">
+      <div class="empty-title">Nothing here yet</div>
+      <div class="empty-hint">
+        <%= @q.present? || @filter != "all" ? "No shops match this search or filter." : "Add your first shop to get started." %>
+      </div>
+    </div>
+  <% end %>
+</div>

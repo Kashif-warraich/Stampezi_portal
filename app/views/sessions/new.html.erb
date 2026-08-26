@@ -1,17 +1,39 @@
-<% content_for :title, "Stampezi admin" %>
-<main class="narrow" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center">
-  <h1>Stampezi admin</h1>
+<% content_for :title, "Sign in · Stampezi" %>
 
-  <%= form_with url: admin_login_path, method: :post do |form| %>
-    <%= hidden_field_tag :next, params[:next] %>
-    <label>
-      Email
-      <%= form.email_field :email, autocomplete: "username", required: true, autofocus: true %>
-    </label>
-    <label>
-      Password
-      <%= form.password_field :password, autocomplete: "current-password", required: true %>
-    </label>
-    <%= form.submit "Sign in", class: "primary" %>
-  <% end %>
-</main>
+<div class="auth">
+  <div class="auth-brand">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <span class="brand-name">Stampezi</span>
+    </div>
+    <div>
+      <div class="auth-kicker">Admin portal</div>
+      <h1>Shops, licences and releases in one place.</h1>
+      <p>Publish installers, keep shop records current, and manage who has access.</p>
+    </div>
+    <div class="auth-foot">internal use only</div>
+  </div>
+
+  <div class="auth-panel">
+    <div class="auth-form">
+      <h2>Sign in</h2>
+      <p class="card-hint">Use your Stampezi admin credentials.</p>
+
+      <%= form_with url: admin_login_path, method: :post do |form| %>
+        <%= hidden_field_tag :next, params[:next] %>
+        <label class="field">Email
+          <%= form.email_field :email, autocomplete: "username", required: true, autofocus: true,
+                placeholder: "admin@stampezi.it" %>
+        </label>
+        <label class="field">Password
+          <%= form.password_field :password, autocomplete: "current-password", required: true,
+                placeholder: "••••••••" %>
+        </label>
+        <% if flash[:alert] %>
+          <div class="alert-box"><b>!</b><span><%= flash[:alert] %></span></div>
+        <% end %>
+        <%= form.submit "Sign in", class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+</div>

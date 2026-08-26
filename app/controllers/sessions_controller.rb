@@ -1,6 +1,8 @@
 class SessionsController < ApplicationController
+  layout "admin"
+
   def new
-    redirect_to admin_shops_path if signed_in?
+    redirect_to admin_root_path if signed_in?
   end
 
   def create
@@ -32,6 +34,6 @@ class SessionsController < ApplicationController
   # Only same-site admin paths, so ?next= cannot bounce an admin off to another host.
   def safe_next_path
     candidate = params[:next].to_s
-    candidate.start_with?("/admin") ? candidate : admin_shops_path
+    candidate.start_with?("/admin") ? candidate : admin_root_path
   end
 end

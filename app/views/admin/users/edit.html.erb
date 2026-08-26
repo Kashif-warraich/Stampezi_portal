@@ -1,0 +1,12 @@
+<% content_for :title, "Edit #{@user.email} · Stampezi" %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Access</div>
+    <h1>Edit <%= @user.email %></h1>
+  </div>
+</header>
+
+<div class="card pad form-card">
+  <%= render "form", user: @user %>
+</div>
