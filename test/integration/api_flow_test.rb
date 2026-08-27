@@ -80,6 +80,16 @@ class ApiFlowTest < ActionDispatch::IntegrationTest
     assert_select "input#file[multiple]"
   end
 
+  # Both are plain HTML elements rather than markup a script has to invent, so a broken
+  # script leaves a page that still says what it is doing.
+  test "the upload page has a progress bar and a success dialog" do
+    get "/upload", params: { l: @license }
+    follow_redirect!
+
+    assert_select "progress#bar"
+    assert_select "dialog#done"
+  end
+
   test "one QR cookie sends a whole batch, and the poll returns every file" do
     get "/upload", params: { l: @license }
 

@@ -198,36 +198,62 @@ class AdminReleasesTest < ActionDispatch::IntegrationTest
     assert_equal "1.0.1", other.reload.target_agent_version
   end
 
-  # Two different questions, so two columns. Targeted is intent and only an operator moves
-  # it; Running is what the shops report, and it moves on its own.
-  test "the releases list counts what is targeted and what is actually running" do
+  # Two columns because they answer different questions. Running is what the shops report;
+  # Pending is what has been asked for and has not arrived yet.
+  test "rolling out puts a shop in Pending, not in Running" do
     release = upload!("1.0.1")
 
     get "/admin/agent_releases"
     assert_select "tbody tr td:nth-child(2)", text: "0"   # running
-    assert_select "tbody tr td:nth-child(3)", text: "0"   # targeted
+    assert_select "tbody tr td:nth-child(3)", text: "0"   # pending
 
-    # Rolling out moves Targeted immediately. Running does not: the shop is still on its
-    # old build until it checks in and says otherwise.
     post "/admin/agent_releases/#{release.id}/roll_out", params: { shop_ids: [ @shop.id ] }
 
+    # Asked for, not yet arrived: the shop is still on its old build.
     get "/admin/agent_releases"
     assert_select "tbody tr td:nth-child(2)", text: "0"
     assert_select "tbody tr td:nth-child(3)", text: "1"
   end
 
-  test "the running count follows the licence check with no operator action" do
+  test "a shop that reports the new version moves from Pending to Running on its own" do
     release = upload!("1.0.1")
     post "/admin/agent_releases/#{release.id}/roll_out", params: { shop_ids: [ @shop.id ] }
 
-    # Exactly what the desktop sends once it has installed the new build.
+    # Exactly what the desktop sends once it has installed the new build. No operator action.
     post "/api/license/check",
       params: { license: @shop.license.license_number, machineFingerprint: "A", agentVersion: "1.0.1" },
       as: :json
     assert_response :success
 
     get "/admin/agent_releases"
-    assert_select "tbody tr td:nth-child(2)", text: "1"
-    assert_select "tbody tr td:nth-child(3)", text: "1"
+    assert_select "tbody tr td:nth-child(2)", text: "1"   # arrived
+    assert_select "tbody tr td:nth-child(3)", text: "0"   # nothing outstanding
+
+    # The standing instruction is untouched, so the release a shop depends on stays undeletable.
+    assert_equal "1.0.1", @shop.reload.target_agent_version
+    assert release.reload.targeted_by.any?
+  end
+
+  # The release page says where each shop stands rather than repeating a version number in
+  # two adjacent columns. The stored target is deliberately not shown once it has arrived.
+  test "the release page shows a shop as updating, then up to date, then frozen" do
+    release = upload!("1.0.1")
+
+    get "/admin/agent_releases/#{release.id}"
+    assert_select "td .badge", text: "frozen"
+
+    post "/admin/agent_releases/#{release.id}/roll_out", params: { shop_ids: [ @shop.id ] }
+    get "/admin/agent_releases/#{release.id}"
+    assert_select "td .badge", text: "updating → 1.0.1"
+
+    post "/api/license/check",
+      params: { license: @shop.license.license_number, machineFingerprint: "A", agentVersion: "1.0.1" },
+      as: :json
+    get "/admin/agent_releases/#{release.id}"
+    assert_select "td .badge", text: "up to date"
+
+    # Arrived, and still ticked - the checkbox reflects the standing instruction, which is
+    # what a reinstall from an older setup.exe snaps back to.
+    assert_select "input[type=checkbox][checked=checked]"
   end
 end

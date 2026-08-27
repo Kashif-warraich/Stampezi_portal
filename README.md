@@ -43,7 +43,7 @@ Ransack, no `dartsass-rails` and no Sprockets to fight Propshaft. (The
 | Dashboard | licence counts by status, files waiting, recent uploads, newest releases |
 | Shops | full CRUD, name search, status filter chips; creating one issues its licence in the same transaction |
 | Shop page | **Extend** by N months, set the expiry date directly, activate/deactivate, **Reset machine binding** (30-day cooldown), **Download QR** as a print-resolution PNG, last 25 uploads |
-| Releases | upload a build, publish, rename, delete, choose which shops it rolls out to, and watch Running catch up with Targeted |
+| Releases | upload a build, publish, rename, delete, choose which shops it rolls out to, and watch Pending fall to zero as Running climbs |
 | Users | full CRUD — add, rename, change password, delete |
 
 A shop's licence number is never editable: it is printed on QR codes and configured into
@@ -63,12 +63,19 @@ form is what sets `shops.target_agent_version` — tick two shops on Monday, the
 Wednesday. Unticking a shop freezes it where it is rather than rolling it back, because a
 rollback has to be an explicit choice.
 
-The list shows two counts per release, and they answer different questions. **Targeted** is
-what an operator asked for - it moves the instant you press Apply. **Running** is what the
-shops themselves last reported on their licence check, so it climbs on its own as they take
-the build. During a staged rollout the gap between the two is the progress; when they match,
-the rollout is finished. Both read 0 on a release nobody has rolled out yet, which is
-correct rather than broken.
+The list shows two counts per release. **Running** is what the shops themselves last
+reported on their licence check, so it climbs on its own as they take the build. **Pending**
+is what has been asked for and has not arrived yet: rolling out to five shops reads 5 and
+counts down to 0. Pending 0 with Running 5 is a finished rollout; both reading 0 means
+nobody has been rolled out to yet, which is correct rather than broken.
+
+On a release's own page each shop shows where it stands - **frozen** (no target, so it keeps
+what is installed), **updating -> x.y.z**, or **up to date**. The target version is printed
+only while it differs from what the shop reports; once they match, repeating it in the next
+column tells the operator nothing. It is still stored, though: `shops.target_agent_version`
+is a standing instruction, not a queue item, and it is what makes a shop reinstalled from an
+old `setup.exe` update itself back to where it belongs - as well as what stops the release it
+depends on being deleted or pruned out of R2.
 
 R2 keeps the newest three published builds (`AgentRelease::KEEP_OBJECTS`) and never prunes
 a version some shop is still pointed at, which would strand that shop with an update it can

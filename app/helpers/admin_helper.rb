@@ -21,6 +21,19 @@ module AdminHelper
     end
   end
 
+  # Where one shop stands against its own target. The target version is worth printing only
+  # while it differs from what the shop reports - once they match it is the same number in
+  # two adjacent columns, and what the operator wants to see there is simply that this one
+  # is done. The stored target is untouched: it is still what makes a reinstall from an old
+  # setup.exe snap back, and what stops this release being deleted or pruned.
+  def update_state_badge(shop)
+    target = shop.target_agent_version
+    return status_badge("frozen", "muted") if target.blank?
+
+    shop.license&.agent_version == target ? status_badge("up to date", "ok")
+                                          : status_badge("updating → #{target}", "warn")
+  end
+
   def fmt_time(time)
     time ? tag.span(time.strftime("%Y-%m-%d %H:%M"), class: "mono dim") : tag.span("—", class: "dim")
   end

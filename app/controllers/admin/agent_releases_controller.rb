@@ -24,8 +24,17 @@ module Admin
       # Running is what each shop last told us it was executing, so it moves on its own as
       # licence checks come in. Targeted is what an operator asked for and only moves when
       # someone clicks Apply. During a rollout the gap between them IS the progress.
-      @running  = License.where.not(agent_version: nil).group(:agent_version).count
-      @targeted = Shop.where.not(target_agent_version: nil).group(:target_agent_version).count
+      @running = License.where.not(agent_version: nil).group(:agent_version).count
+
+      # Outstanding work, not total assignment: a shop drops out of Pending the moment it
+      # reports the version it was pointed at. Rolling out to five shops reads 5, and counts
+      # down to 0 as they take it, so Pending 0 with Running 5 is a finished rollout.
+      # shops.target_agent_version is left alone - it is the standing instruction, and it is
+      # what stops a release a shop depends on being deleted or pruned out of R2.
+      @pending = Shop.left_joins(:license)
+                     .where.not(target_agent_version: nil)
+                     .where("licenses.agent_version IS DISTINCT FROM shops.target_agent_version")
+                     .group(:target_agent_version).count
     end
 
     def show

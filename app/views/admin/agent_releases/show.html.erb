@@ -42,7 +42,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th></th><th>Shop</th><th>Running</th><th>Targeted at</th><th>Last check-in</th></tr>
+            <tr><th></th><th>Shop</th><th>Running</th><th>Update</th><th>Last check-in</th></tr>
           </thead>
           <tbody>
             <% @shops.each do |shop| %>
@@ -53,7 +53,7 @@
                 </td>
                 <td><%= label_tag "shop_#{shop.id}", shop.name, class: "strong" %></td>
                 <td class="mono dim"><%= shop.license&.agent_version || "not reported" %></td>
-                <td class="mono dim"><%= shop.target_agent_version || "frozen" %></td>
+                <td><%= update_state_badge shop %></td>
                 <td><%= fmt_time shop.license&.last_check_at %></td>
               </tr>
             <% end %>

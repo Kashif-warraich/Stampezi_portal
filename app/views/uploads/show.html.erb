@@ -12,6 +12,7 @@
       <input id="file" type="file" multiple
              accept="<%= UploadRules::ALLOWED_EXTENSIONS.map { |e| ".#{e}" }.join(",") %>">
     </label>
+    <progress id="bar" max="100" value="0" style="display:none"></progress>
     <p id="progress" class="muted break" style="font-size:.875rem" aria-live="polite"></p>
     <div id="error" style="display:none" aria-live="polite">
       <p class="status-expired break" id="error-text" style="font-size:.875rem"></p>
@@ -19,12 +20,14 @@
     </div>
   </section>
 
-  <section id="done" class="card" style="display:none">
+  <%# A native <dialog>: modal, focus-trapped and Escape-dismissable with no library and no
+      JavaScript of ours to keep it on top of the page. %>
+  <dialog id="done" class="card">
     <p style="font-size:1.05rem;font-weight:500" id="done-title">Your file has been sent to the shop</p>
     <p class="muted break" id="done-names" style="font-size:.875rem"></p>
     <p class="status-expired break" id="done-failed" style="font-size:.875rem;display:none"></p>
-    <button type="button" data-reset>Send more files</button>
-  </section>
+    <button type="button" data-close autofocus>Send more files</button>
+  </dialog>
 </main>
 
 <script type="application/json" id="upload-config">
@@ -41,19 +44,31 @@
     var IDLE_LABEL = "Choose files";
 
     var input = document.getElementById("file");
-    var picker = document.getElementById("picker");
     var pickerLabel = document.getElementById("picker-label");
     var progress = document.getElementById("progress");
     var errorBox = document.getElementById("error");
     var errorText = document.getElementById("error-text");
+    var bar = document.getElementById("bar");
     var done = document.getElementById("done");
     var doneTitle = document.getElementById("done-title");
     var doneNames = document.getElementById("done-names");
     var doneFailed = document.getElementById("done-failed");
 
+    // Old browsers without <dialog> still get the message, just not on top of the page.
+    function openDone() {
+      if (typeof done.showModal === "function") done.showModal();
+      else done.setAttribute("open", "");
+    }
+
+    function closeDone() {
+      if (done.open && typeof done.close === "function") done.close();
+      else done.removeAttribute("open");
+    }
+
     // Nothing landed - stay on the picker and say why.
     function fail(text) {
       progress.textContent = "";
+      bar.style.display = "none";
       pickerLabel.textContent = IDLE_LABEL;
       input.disabled = false;
       errorText.textContent = text;
@@ -65,15 +80,24 @@
       input.disabled = false;
       pickerLabel.textContent = IDLE_LABEL;
       progress.textContent = "";
+      bar.style.display = "none";
+      bar.value = 0;
       errorBox.style.display = "none";
       doneFailed.style.display = "none";
-      done.style.display = "none";
-      picker.style.display = "block";
     }
 
     document.querySelectorAll("[data-reset]").forEach(function (button) {
       button.addEventListener("click", reset);
     });
+
+    document.querySelectorAll("[data-close]").forEach(function (button) {
+      button.addEventListener("click", closeDone);
+    });
+
+    // Escape closes a modal dialog on its own, so clearing the picker hangs off close
+    // rather than off the button - otherwise dismissing with the keyboard would leave the
+    // page showing the last upload's state.
+    done.addEventListener("close", reset);
 
     function extensionOf(name) {
       var dot = name.lastIndexOf(".");
@@ -87,9 +111,29 @@
       return e;
     }
 
+    // XHR, not fetch: only XHR reports upload progress, and on a phone a 40 MB PUT with
+    // nothing moving on screen looks like a page that has died. onProgress is fed the bytes
+    // of THIS file; the caller turns that into a figure for the whole batch.
+    function put(url, file, onProgress) {
+      return new Promise(function (resolve, reject) {
+        var request = new XMLHttpRequest();
+        request.open("PUT", url);
+        request.upload.onprogress = function (event) {
+          if (event.lengthComputable) onProgress(event.loaded);
+        };
+        request.onload = function () {
+          if (request.status >= 200 && request.status < 300) resolve();
+          else reject(friendly("the upload didn't finish"));
+        };
+        request.onerror = function () { reject(friendly("check your connection")); };
+        request.onabort = function () { reject(friendly("the upload was interrupted")); };
+        request.send(file);
+      });
+    }
+
     // One file, start to finish. An unauthorized flag aborts the whole batch: re-trying
     // the rest without the cookie would just fail the same way.
-    async function send(file) {
+    async function send(file, onProgress) {
       var sessionResponse = await fetch("/api/upload-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -105,8 +149,7 @@
 
       var session = await sessionResponse.json();
 
-      var putResponse = await fetch(session.presignedPutUrl, { method: "PUT", body: file });
-      if (!putResponse.ok) throw friendly("the upload didn't finish");
+      await put(session.presignedPutUrl, file, onProgress);
 
       var completeResponse = await fetch("/api/upload-complete", {
         method: "POST",
@@ -144,26 +187,50 @@
       input.disabled = true;
       pickerLabel.textContent = "Sending…";
 
+      // Weighted by size, so one big file among small ones does not sit the bar at 25%
+      // and then jump. Bytes already finished plus bytes in flight, over the batch total.
+      var totalBytes = queue.reduce(function (sum, file) { return sum + file.size; }, 0);
+      var doneBytes = 0;
+      bar.value = 0;
+      bar.style.display = "block";
+
+      function showProgress(loadedNow, name, index) {
+        var percent = totalBytes > 0
+          ? Math.min(100, Math.round(((doneBytes + loadedNow) / totalBytes) * 100))
+          : 0;
+        bar.value = percent;
+        progress.textContent = (queue.length > 1
+          ? "Sending " + (index + 1) + " of " + queue.length + ": " + name
+          : "Sending " + name) + " - " + percent + "%. Keep this page open.";
+      }
+
       // One at a time. A phone on mobile data clears a queue faster than it clears five
       // parallel uploads, the progress line stays honest, and a drop costs one file.
       var sent = [];
       for (var i = 0; i < queue.length; i++) {
-        progress.textContent = queue.length > 1
-          ? "Sending " + (i + 1) + " of " + queue.length + ": " + queue[i].name + ". Keep this page open."
-          : "Sending " + queue[i].name + ". Keep this page open.";
+        var file = queue[i];
+        var index = i;
+        showProgress(0, file.name, index);
         try {
-          await send(queue[i]);
-          sent.push(queue[i].name);
+          await send(file, function (loaded) { showProgress(loaded, file.name, index); });
+          sent.push(file.name);
         } catch (e) {
           if (e && e.unauthorized) return fail("Please scan the shop's QR code again to start.");
-          failed.push(queue[i].name + " - " + (e && e.friendly ? e.message : "check your connection"));
+          failed.push(file.name + " - " + (e && e.friendly ? e.message : "check your connection"));
         }
+        // Advances even when the file failed, so the bar keeps moving through the batch
+        // instead of stalling on the one that did not make it.
+        doneBytes += file.size;
+        showProgress(0, file.name, index);
       }
 
       if (!sent.length) return fail(failed.join(". ") + ".");
 
       progress.textContent = "";
-      picker.style.display = "none";
+      bar.style.display = "none";
+      input.disabled = false;
+      input.value = "";
+      pickerLabel.textContent = IDLE_LABEL;
       doneTitle.textContent = sent.length === 1
         ? "Your file has been sent to the shop"
         : "Your " + sent.length + " files have been sent to the shop";
@@ -172,7 +239,7 @@
         doneFailed.textContent = "Not sent: " + failed.join(". ") + ".";
         doneFailed.style.display = "block";
       }
-      done.style.display = "block";
+      openDone();
     });
   })();
 </script>
