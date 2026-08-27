@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -54,10 +54,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_090000) do
     t.datetime "delivered_at"
     t.string "file_name", null: false
     t.string "object_key", null: false
+    t.datetime "purged_at"
     t.uuid "shop_id", null: false
     t.string "status", null: false
     t.datetime "updated_at", null: false
     t.index ["shop_id", "status", "created_at"], name: "index_upload_sessions_on_shop_id_and_status_and_created_at"
+    t.index ["shop_id", "updated_at"], name: "index_upload_sessions_unpurged", where: "(purged_at IS NULL)"
     t.index ["shop_id"], name: "index_upload_sessions_on_shop_id"
   end
 

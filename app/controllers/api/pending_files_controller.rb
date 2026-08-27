@@ -7,6 +7,13 @@ module Api
 
       license = License.find_by(license_number:)
       return render_error("Licence not found", status: :not_found) if license.nil?
+
+      # Housekeeping rides on the heartbeat: this plan has no scheduler, and this is the
+      # one endpoint every shop calls every few seconds. Ahead of the expiry check, so a
+      # lapsed shop's files stop costing money too - and it is capped and never raises,
+      # so the poll below is unaffected either way.
+      UploadSession.purge_r2!(license.shop_id)
+
       return if refuse_expired!(license)
 
       # Only "Uploaded" is ever returned, so a Delivered or Expired session cannot come back.

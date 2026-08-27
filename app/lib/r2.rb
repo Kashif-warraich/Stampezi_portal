@@ -65,5 +65,16 @@ module R2
     client.delete_object(bucket:, key: object_key)
   end
 
+  # One request per 1000 keys, which is the API's limit. The customer-upload sweep runs
+  # inside a shop's poll, so a round trip per file would be a round trip per file.
+  def self.delete_objects(object_keys)
+    return if object_keys.empty?
+
+    s3 = client
+    object_keys.each_slice(1000) do |slice|
+      s3.delete_objects(bucket:, delete: { objects: slice.map { |key| { key: } } })
+    end
+  end
+
   def self.presigner = Aws::S3::Presigner.new(client:)
 end
