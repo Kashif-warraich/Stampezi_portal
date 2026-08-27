@@ -29,13 +29,16 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Version</th><th>Shops on it</th><th>State</th><th>Size</th><th>Published</th><th></th></tr>
+          <tr><th>Version</th><th>Running</th><th>Targeted</th><th>State</th><th>Size</th><th>Published</th><th></th></tr>
         </thead>
         <tbody>
           <% @releases.each do |release| %>
             <tr>
               <td><%= link_to release.version, admin_agent_release_path(release), class: "mono strong" %></td>
-              <td><%= release.targeted_by.count %></td>
+              <%# Reported by the shops themselves on every licence check. %>
+              <td><%= @running[release.version].to_i %></td>
+              <%# Asked for by an operator; only Apply moves this. %>
+              <td class="dim"><%= @targeted[release.version].to_i %></td>
               <td><%= release_state_badge release %></td>
               <td class="mono dim"><%= release_size release %></td>
               <td><%= fmt_time release.published_at %></td>

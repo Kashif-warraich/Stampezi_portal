@@ -18,6 +18,14 @@ module Admin
               end
       scope = scope.where("version LIKE ?", "%#{AgentRelease.sanitize_sql_like(@q)}%") if @q.present?
       @releases = AgentRelease.newest_first(scope)
+
+      # Two counts per release, and two queries for the whole page rather than two per row.
+      #
+      # Running is what each shop last told us it was executing, so it moves on its own as
+      # licence checks come in. Targeted is what an operator asked for and only moves when
+      # someone clicks Apply. During a rollout the gap between them IS the progress.
+      @running  = License.where.not(agent_version: nil).group(:agent_version).count
+      @targeted = Shop.where.not(target_agent_version: nil).group(:target_agent_version).count
     end
 
     def show

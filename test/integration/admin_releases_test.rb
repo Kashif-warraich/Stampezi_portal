@@ -197,4 +197,37 @@ class AdminReleasesTest < ActionDispatch::IntegrationTest
     assert_nil @shop.reload.target_agent_version
     assert_equal "1.0.1", other.reload.target_agent_version
   end
+
+  # Two different questions, so two columns. Targeted is intent and only an operator moves
+  # it; Running is what the shops report, and it moves on its own.
+  test "the releases list counts what is targeted and what is actually running" do
+    release = upload!("1.0.1")
+
+    get "/admin/agent_releases"
+    assert_select "tbody tr td:nth-child(2)", text: "0"   # running
+    assert_select "tbody tr td:nth-child(3)", text: "0"   # targeted
+
+    # Rolling out moves Targeted immediately. Running does not: the shop is still on its
+    # old build until it checks in and says otherwise.
+    post "/admin/agent_releases/#{release.id}/roll_out", params: { shop_ids: [ @shop.id ] }
+
+    get "/admin/agent_releases"
+    assert_select "tbody tr td:nth-child(2)", text: "0"
+    assert_select "tbody tr td:nth-child(3)", text: "1"
+  end
+
+  test "the running count follows the licence check with no operator action" do
+    release = upload!("1.0.1")
+    post "/admin/agent_releases/#{release.id}/roll_out", params: { shop_ids: [ @shop.id ] }
+
+    # Exactly what the desktop sends once it has installed the new build.
+    post "/api/license/check",
+      params: { license: @shop.license.license_number, machineFingerprint: "A", agentVersion: "1.0.1" },
+      as: :json
+    assert_response :success
+
+    get "/admin/agent_releases"
+    assert_select "tbody tr td:nth-child(2)", text: "1"
+    assert_select "tbody tr td:nth-child(3)", text: "1"
+  end
 end

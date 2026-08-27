@@ -43,7 +43,7 @@ Ransack, no `dartsass-rails` and no Sprockets to fight Propshaft. (The
 | Dashboard | licence counts by status, files waiting, recent uploads, newest releases |
 | Shops | full CRUD, name search, status filter chips; creating one issues its licence in the same transaction |
 | Shop page | **Extend** by N months, set the expiry date directly, activate/deactivate, **Reset machine binding** (30-day cooldown), **Download QR** as a print-resolution PNG, last 25 uploads |
-| Releases | upload a build, publish, rename, delete, and choose which shops it rolls out to |
+| Releases | upload a build, publish, rename, delete, choose which shops it rolls out to, and watch Running catch up with Targeted |
 | Users | full CRUD — add, rename, change password, delete |
 
 A shop's licence number is never editable: it is printed on QR codes and configured into
@@ -62,6 +62,13 @@ Publishing arms nothing. A release's page lists every shop with a checkbox, and 
 form is what sets `shops.target_agent_version` — tick two shops on Monday, the rest on
 Wednesday. Unticking a shop freezes it where it is rather than rolling it back, because a
 rollback has to be an explicit choice.
+
+The list shows two counts per release, and they answer different questions. **Targeted** is
+what an operator asked for - it moves the instant you press Apply. **Running** is what the
+shops themselves last reported on their licence check, so it climbs on its own as they take
+the build. During a staged rollout the gap between the two is the progress; when they match,
+the rollout is finished. Both read 0 on a release nobody has rolled out yet, which is
+correct rather than broken.
 
 R2 keeps the newest three published builds (`AgentRelease::KEEP_OBJECTS`) and never prunes
 a version some shop is still pointed at, which would strand that shop with an update it can
