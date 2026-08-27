@@ -17,6 +17,9 @@ Rails.application.routes.draw do
   namespace :admin do
     root to: "dashboard#index"
 
+    # Read-only: a view over licences.last_check_at, so there is nothing to create or edit.
+    get "live", to: "live#index"
+
     resources :shops do
       member do
         get  :qr

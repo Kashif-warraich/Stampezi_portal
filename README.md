@@ -41,6 +41,7 @@ Ransack, no `dartsass-rails` and no Sprockets to fight Propshaft. (The
 | Page | What you can do |
 |---|---|
 | Dashboard | licence counts by status, files waiting, recent uploads, newest releases |
+| Live | which shops are still checking in, worst first - the page to open when someone says a shop has stopped printing |
 | Shops | full CRUD, name search, status filter chips; creating one issues its licence in the same transaction |
 | Shop page | **Extend** by N months, set the expiry date directly, activate/deactivate, **Reset machine binding** (30-day cooldown), **Download QR** as a print-resolution PNG, last 25 uploads |
 | Releases | upload a build, publish, rename, delete, choose which shops it rolls out to, and watch Pending fall to zero as Running climbs |
@@ -48,6 +49,24 @@ Ransack, no `dartsass-rails` and no Sprockets to fight Propshaft. (The
 
 A shop's licence number is never editable: it is printed on QR codes and configured into
 desktop services, so renaming a shop is allowed and re-issuing a number is not.
+
+### Live
+
+Every agent writes `licenses.last_check_at` on its licence check, once a minute by default,
+so silence is the whole signal - there is no heartbeat table and nothing extra for a shop to
+send. `/admin/live` buckets shops into **live** (seen in the last 5 minutes), **quiet**
+(under an hour), **not checking in** (over an hour) and **never seen**, sorts the worst to
+the top so one silent shop cannot be pushed off the bottom by a hundred healthy ones, and
+refreshes itself every minute with a `<meta http-equiv="refresh">` - the admin loads no
+JavaScript and this needs none.
+
+The thresholds are fixed in `License::LIVE_WITHIN` and `LATE_WITHIN` rather than derived
+from each shop's `LicenseCheckIntervalMinutes`, because that interval lives in the shop's
+own `setup.ini` and the portal never sees it.
+
+What the page deliberately does not claim is *why* a shop is silent. A stopped service, a
+switched-off PC and a dead router are the same event from here, and a shop whose licence has
+fully expired stops checking in on purpose.
 
 ### Releases and rollout
 

@@ -38,6 +38,25 @@ class License < ApplicationRecord
     [ GRACE_DAYS - ((now - expires_at) / 1.day).floor, 0 ].max
   end
 
+  # A shop's agent checks in every LicenseCheckIntervalMinutes - 1 by default, set in each
+  # shop's setup.ini, which is why these are generous fixed windows rather than a multiple
+  # of an interval this side cannot see. Five missed checks is a shop worth glancing at; an
+  # hour of silence is one worth phoning.
+  LIVE_WITHIN = 5.minutes
+  LATE_WITHIN = 1.hour
+
+  # Deliberately about check-ins, not about the service. From here a stopped service, a PC
+  # switched off, a dead router and an unplugged network cable are the same event, and the
+  # portal must not claim to tell them apart - the wording in the UI says "not checking in"
+  # for that reason.
+  def agent_state(now = Time.current)
+    return "never" if last_check_at.nil?
+    return "live"  if last_check_at > LIVE_WITHIN.ago(now)
+    return "late"  if last_check_at > LATE_WITHIN.ago(now)
+
+    "down"
+  end
+
   # What the admin list shows.
   def status(now = Time.current)
     return "active" if expires_at > now

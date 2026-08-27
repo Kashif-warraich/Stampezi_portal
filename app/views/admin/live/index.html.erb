@@ -1,0 +1,83 @@
+<% content_for :title, "Live · Stampezi" %>
+<%# Left open on a second monitor. No JavaScript is loaded in this layout, and a meta
+    refresh needs none - the agents check in every minute, so does this page. %>
+<% content_for :head do %>
+  <meta http-equiv="refresh" content="60">
+<% end %>
+
+<header class="page-head">
+  <div>
+    <div class="kicker">Fleet</div>
+    <h1>Live</h1>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Live</div>
+    <div class="stat-value"><%= @counts.fetch("live", 0) %></div>
+    <div class="stat-hint">checked in in the last 5 minutes</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Quiet</div>
+    <div class="stat-value"><%= @counts.fetch("late", 0) %></div>
+    <div class="stat-hint">nothing for 5 minutes, but under an hour</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Not checking in</div>
+    <div class="stat-value"><%= @counts.fetch("down", 0) %></div>
+    <div class="stat-hint">silent for over an hour</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Never seen</div>
+    <div class="stat-value"><%= @counts.fetch("never", 0) %></div>
+    <div class="stat-hint">licence issued, agent never installed</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2 class="card-title">Every shop, worst first</h2>
+    <span class="count mono">refreshes every minute</span>
+  </div>
+
+  <% if @shops.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Shop</th><th>Agent</th><th>Last check-in</th><th>Running</th><th>Licence</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% @shops.each do |shop| %>
+            <tr>
+              <td>
+                <%= link_to shop.name, admin_shop_path(shop), class: "strong" %>
+                <div class="cell-sub mono"><%= shop.license&.license_number || "no licence" %></div>
+              </td>
+              <td><%= agent_state_badge @states[shop] %></td>
+              <td>
+                <%= time_since shop.license&.last_check_at %>
+                <div class="cell-sub"><%= fmt_time shop.license&.last_check_at %></div>
+              </td>
+              <td class="mono dim"><%= shop.license&.agent_version || "not reported" %></td>
+              <td><%= status_badge shop.status %></td>
+              <td class="row-actions"><%= link_to "Open", admin_shop_path(shop), class: "btn btn-sm" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="card-hint" style="padding: 14px 18px 18px; margin: 0;">
+      A silent agent means only that: from here a stopped service, a switched-off PC and a
+      dead router look identical. Check that shop's own
+      <span class="mono">%ProgramData%\Stampezi\logs</span> before assuming the service broke.
+      A shop whose licence has fully expired stops checking in on purpose.
+    </p>
+  <% else %>
+    <div class="empty">
+      <div class="empty-title">No shops yet</div>
+      <div class="empty-hint"><%= link_to "Create the first one", new_admin_shop_path %></div>
+    </div>
+  <% end %>
+</div>

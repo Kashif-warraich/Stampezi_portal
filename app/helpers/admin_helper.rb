@@ -34,6 +34,22 @@ module AdminHelper
                                           : status_badge("updating → #{target}", "warn")
   end
 
+  AGENT_STATE_TONES = { "live" => "ok", "late" => "warn", "down" => "bad", "never" => "muted" }.freeze
+  AGENT_STATE_WORDS = {
+    "live" => "live", "late" => "quiet", "down" => "not checking in", "never" => "never seen"
+  }.freeze
+
+  def agent_state_badge(state)
+    status_badge(AGENT_STATE_WORDS.fetch(state, state), AGENT_STATE_TONES.fetch(state, "muted"))
+  end
+
+  # "4 minutes ago", or an em dash when it has never happened.
+  def time_since(time)
+    return tag.span("—", class: "dim") if time.nil?
+
+    tag.span("#{time_ago_in_words(time)} ago", class: "dim")
+  end
+
   def fmt_time(time)
     time ? tag.span(time.strftime("%Y-%m-%d %H:%M"), class: "mono dim") : tag.span("—", class: "dim")
   end

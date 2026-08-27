@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <%= stylesheet_link_tag "admin" %>
+    <%= yield :head %>
   </head>
 
   <body>
@@ -22,8 +23,9 @@
           <nav>
             <%= nav_item "01", "Dashboard", admin_root_path, %w[dashboard] %>
             <%= nav_item "02", "Shops", admin_shops_path, %w[shops] %>
-            <%= nav_item "03", "Releases", admin_agent_releases_path, %w[agent_releases] %>
-            <%= nav_item "04", "Admin users", admin_users_path, %w[users] %>
+            <%= nav_item "03", "Live", admin_live_path, %w[live] %>
+            <%= nav_item "04", "Releases", admin_agent_releases_path, %w[agent_releases] %>
+            <%= nav_item "05", "Admin users", admin_users_path, %w[users] %>
           </nav>
           <div class="sidebar-foot">
             <div class="me">
