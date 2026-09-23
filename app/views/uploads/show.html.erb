@@ -22,11 +22,15 @@
 
   <%# A native <dialog>: modal, focus-trapped and Escape-dismissable with no library and no
       JavaScript of ours to keep it on top of the page. %>
-  <dialog id="done" class="card">
-    <p style="font-size:1.05rem;font-weight:500" id="done-title">Your file has been sent to the shop</p>
-    <p class="muted break" id="done-names" style="font-size:.875rem"></p>
+  <dialog id="done" aria-labelledby="done-title">
+    <div class="tick" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <p style="font-size:1.15rem;font-weight:600;margin:0 0 .5rem" id="done-title">Your file has been sent to the shop</p>
+    <p class="muted break" id="done-names" style="font-size:.875rem;margin:0"></p>
     <p class="status-expired break" id="done-failed" style="font-size:.875rem;display:none"></p>
-    <button type="button" data-close autofocus>Send more files</button>
+    <button type="button" class="send-more" data-close autofocus>Send more files</button>
   </dialog>
 </main>
 
